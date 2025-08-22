@@ -15,6 +15,8 @@
 - Salud: `GET /healthz` (BFF) con **test e2e**.
 - **EventLog (tabla `event_log`)**: `{ id: number; tenantId: number; eventType: string; details?: jsonb; createdAt: Date }`.
 
+**Misión del producto:** pasarela de cumplimiento **invisible** para PYMES: el usuario sigue usando su ERP/TPV/Word/Excel, el **conector** sube los PDFs con **API key**, y el **BFF** los transforma al formato requerido (QR/encabezados), registrando todo en `event_log` y mostrando el estado en el **dashboard**. _(Ver `docs/PRODUCT_CHARTER.md`)_.
+
 ## Reglas de uso del LOG
 
 1. **Una línea por cambio** relevante (fecha + resumen + PR/commit si aplica).
