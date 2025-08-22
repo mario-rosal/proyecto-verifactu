@@ -88,18 +88,18 @@ jobs:
           npm ci
       - name: Lint
         run: npm run lint --if-present
-           working-directory: verifactu-connector
-          continue-on-error: true
+        working-directory: verifactu-connector
+        continue-on-error: true
 
-  - name: Tipos
-    run: npm run typecheck --if-present
-    working-directory: verifactu-connector
-    continue-on-error: true
+      - name: Tipos
+        run: npm run typecheck --if-present
+        working-directory: verifactu-connector
+        continue-on-error: true
 
-  - name: Tests
-    run: npm test --if-present
-    working-directory: verifactu-connector
-    continue-on-error: true
+      - name: Tests
+        run: npm test --if-present
+        working-directory: verifactu-connector
+        continue-on-error: true
 
   frontend:
     name: Frontend
