@@ -12,8 +12,8 @@ jobs:
   backend-bff:
     name: Backend BFF
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-    # Postgres para los tests e2e del BFF
     services:
       postgres:
         image: postgres:16
@@ -21,15 +21,16 @@ jobs:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
           POSTGRES_DB: verifactu_test
-        # No exponemos puertos; nos conectamos por el nombre del servicio "postgres"
+        # GitHub esperará a que el healthcheck sea "healthy"
         options: >-
-          --health-cmd "pg_isready -U test -d verifactu_test"
-          --health-interval 10s
+          --health-cmd "pg_isready -U test"
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 10
+          --health-retries 30
+          --health-start-period 20s
 
-    # Forzamos las credenciales/host que usa el BFF en los tests
     env:
+      # OJO: host = postgres (nombre del servicio), no localhost
       DATABASE_URL: postgres://test:test@postgres:5432/verifactu_test
       NODE_ENV: test
       PGUSER: test
@@ -44,13 +45,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-
-      # Espera explícita a que la BD esté sana antes de lanzar el app/test
-      - name: Esperar a que la BD esté lista
-        run: |
-          sudo apt-get update >/dev/null
-          sudo apt-get install -y postgresql-client >/dev/null
-          until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE"; do sleep 1; done
 
       - name: Instalar deps
         working-directory: verifactu-bff
