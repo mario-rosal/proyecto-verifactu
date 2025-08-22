@@ -43,15 +43,13 @@ async logEvent(tenantId: number, createEventDto: CreateEventDto) {
 
   const tenant = await this.tenantRepository.findOneBy({ id: tenantId });
   if (!tenant) {
-    throw new NotFoundException(
-      `Tenant con ID ${tenantId} no encontrado al intentar registrar un evento.`,
-    );
+    throw new NotFoundException(`Tenant con ID ${tenantId} no encontrado al intentar registrar un evento.`);
   }
 
   const newEvent = this.eventLogRepository.create({
-    tenant: String(tenant.id),               // 👈 coincide con @Column({ type: 'varchar' })
-    eventType: createEventDto.eventType,     // 👈 ahora existe en la entidad
-    details: createEventDto.details,         // 👈 ahora existe en la entidad
+    tenantId,                              // 👈 columna tenant_id
+    eventType: createEventDto.eventType,   // 👈 columna event_type
+    details: createEventDto.details,       // 👈 columna details
   });
 
   await this.eventLogRepository.save(newEvent);

@@ -1,21 +1,20 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
 
-@Entity({ name: 'event_logs' })
+@Entity({ name: 'event_log' }) // 👈 coincide con tu tabla real
 export class EventLog {
-  @PrimaryGeneratedColumn('uuid')
-  id!: string;
+  @PrimaryGeneratedColumn({ type: 'int' })
+  id!: number;
 
-  // Guardamos el identificador del tenant como string (puedes cambiar a number si prefieres)
-  @Column({ type: 'varchar', length: 128 })
-  tenant!: string;
+  @Column({ name: 'tenant_id', type: 'int' })
+  tenantId!: number;
 
-  @Column({ type: 'varchar', length: 64 })
+  // Si en tu DB "event_type" es un enum propio, de momento lo tratamos como texto para no liarla
+  @Column({ name: 'event_type', type: 'varchar', length: 64 })
   eventType!: string;
 
-  // Detalles del evento (payload libre)
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ name: 'details', type: 'jsonb', nullable: true })
   details?: unknown;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 }
