@@ -13,7 +13,7 @@ import { Job } from './entities/job.entity';
 import { AuthModule } from './auth/auth.module';
 import { User } from './entities/user.entity';
 import { ApiKey } from './entities/api-key.entity';
-import { EventLog } from './entities/event-log.entity'; // <-- 1. Importar la nueva entidad
+import { EventLog } from './event-log/event-log.entity';
 import { HealthModule } from './health/health.module';
 
 @Module({

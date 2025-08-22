@@ -11,7 +11,7 @@ import * as bcrypt from 'bcrypt';
 import { InvoiceRecord } from './entities/invoice_record.entity';
 import { ApiKey } from './entities/api-key.entity';
 import { createHash, randomBytes  } from 'crypto';
-import { EventLog, EventType } from './entities/event-log.entity'; // <-- 1. Importar EventLog
+import { EventLog } from './event-log/event-log.entity';
 import { CreateEventDto } from './dto/create-event.dto'; // <-- 2. Importar DTO de Evento
 
 
@@ -28,30 +28,36 @@ export class AppService {
         private readonly invoiceRecordRepository: Repository<InvoiceRecord>,
         @InjectRepository(ApiKey)
         private readonly apiKeyRepository: Repository<ApiKey>,
+        @InjectRepository(EventLog)
+        private readonly eventLogRepository: Repository<EventLog>,
        @InjectRepository(User)
        private readonly userRepository: Repository<User>,
        private readonly dataSource: DataSource, // Inyectamos el DataSource para manejar transacciones
     ) {}
 
-    // --- 👇 NUEVA LÓGICA PARA REGISTRAR EVENTOS 👇 ---
-  async logEvent(tenantId: number, createEventDto: CreateEventDto) {
-    this.logger.log(`Registrando evento de tipo '${createEventDto.eventType}' para el tenant ID: ${tenantId}`);
-    
-    const tenant = await this.tenantRepository.findOneBy({ id: tenantId });
-    if (!tenant) {
-      // Este error no debería ocurrir si el ApiKeyGuard funciona, pero es una buena práctica
-      throw new NotFoundException(`Tenant con ID ${tenantId} no encontrado al intentar registrar un evento.`);
-    }
+// --- 👇 NUEVA LÓGICA PARA REGISTRAR EVENTOS (corregida) 👇 ---
+async logEvent(tenantId: number, createEventDto: CreateEventDto) {
+  this.logger.log(
+    `Registrando evento de tipo '${createEventDto.eventType}' para el tenant ID: ${tenantId}`,
+  );
 
-    const newEvent = this.eventLogRepository.create({
-      tenant: tenant,
-      eventType: createEventDto.eventType,
-      details: createEventDto.details,
-    });
-
-    await this.eventLogRepository.save(newEvent);
-    return { status: 'evento registrado con éxito' };
+  const tenant = await this.tenantRepository.findOneBy({ id: tenantId });
+  if (!tenant) {
+    throw new NotFoundException(
+      `Tenant con ID ${tenantId} no encontrado al intentar registrar un evento.`,
+    );
   }
+
+  const newEvent = this.eventLogRepository.create({
+    tenant: String(tenant.id),               // 👈 coincide con @Column({ type: 'varchar' })
+    eventType: createEventDto.eventType,     // 👈 ahora existe en la entidad
+    details: createEventDto.details,         // 👈 ahora existe en la entidad
+  });
+
+  await this.eventLogRepository.save(newEvent);
+  return { status: 'evento registrado con éxito' };
+}
+
 
    // --- LÓGICA DE NEGOCIO PARA EL ONBOARDING UNIFICADO Y SEGURO ---
    async unifiedOnboarding(unifiedRegisterDto: UnifiedRegisterDto) {

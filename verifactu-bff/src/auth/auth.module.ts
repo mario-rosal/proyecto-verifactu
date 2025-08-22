@@ -1,19 +1,18 @@
-// ========================================================================
-// ARCHIVO 1 de 4: verifactu-bff/src/auth/auth.module.ts (NUEVO ARCHIVO)
-// ========================================================================
-// EXPLICACIÓN: Creamos un módulo dedicado para toda la lógica de
-// autenticación. Importamos JwtModule para la gestión de tokens y
-// TypeOrmModule para poder interactuar con las entidades User y Tenant.
-// ========================================================================
-
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { JwtModule } from '@nestjs/jwt';
+
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { TypeOrmModule } from '@nestjs/typeorm';
+
+// Entidades
 import { User } from '../entities/user.entity';
 import { Tenant } from '../entities/tenant.entity';
-import { JwtModule } from '@nestjs/jwt';
 import { ApiKey } from '../entities/api-key.entity';
+
+// Guard (ajusta la ruta si lo tienes en ./guards/api-key.guard)
+import { ApiKeyGuard } from './api-key.guard';
 
 @Module({
   imports: [
@@ -25,6 +24,13 @@ import { ApiKey } from '../entities/api-key.entity';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [
+    AuthService,
+    // registramos el guard a nivel global desde el mismo módulo que provee AuthService
+    { provide: APP_GUARD, useClass: ApiKeyGuard },
+  ],
+  // exporta el servicio por si lo necesitan otros módulos
+  exports: [AuthService],
 })
 export class AuthModule {}
+
