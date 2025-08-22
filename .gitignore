@@ -1,0 +1,14 @@
+﻿node_modules/
+dist/
+build/
+coverage/
+.nyc_output/
+*.log
+.env
+.env.*.local
+.vscode/
+.DS_Store
+Thumbs.db
+out/
+release/
+*.asar
