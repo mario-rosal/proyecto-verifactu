@@ -28,6 +28,10 @@
 
 ## Entradas (más reciente primero)
 
+## 2025-08-22 — Tests e2e append-only
+
+- E2E valida que UPDATE/DELETE están bloqueados por triggers en `event_log` e `invoice_record` (usa fila existente o inserta mínima válida).
+
 ### 2025-08-22 — Alineación con tabla existente `event_log`
 
 - BFF: la entidad `EventLog` mapea a la tabla real **`event_log`** (cols: `id`, `tenant_id`, `event_type`, `details`, `created_at`).

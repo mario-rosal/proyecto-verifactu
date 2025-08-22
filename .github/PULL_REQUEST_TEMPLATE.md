@@ -1,12 +1,18 @@
 ## Qué cambia y por qué
-(Resumen funcional y técnico breve)
+(resumen breve; relaciona con issue/LOG)
 
-## Plan del asistente (si hubo IA)
-(Pasos, riesgos, alcance)
+## Alcance
+- TOCADO: (rutas)
+- NO TOCADO: (rutras)
 
-## Evidencias
-- Logs de CI
-- Capturas o casos manuales
+## Pruebas
+- Comandos: …
+- Resultado esperado: …
+- Capturas/logs (si aplica)
 
-## Tests añadidos / regresión
-(archivos y escenarios)
+## Checklist
+- [ ] `git diff` acotado al alcance
+- [ ] Tests añadidos/ajustados
+- [ ] CI **BFF** verde (lint/types/e2e)
+- [ ] `docs/LOG.md` actualizado (+ ADR si procede)
+- [ ] Sin secretos ni contratos rotos
