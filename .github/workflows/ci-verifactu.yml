@@ -30,33 +30,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - name: Instalar deps
-        run: |
-          cd verifactu-bff # <-- ajusta si tu ruta es distinta
-          npm ci
-      - name: Lint
-        run: |
-          cd verifactu-bff
-          npm run lint --if-present
-      - name: Tipos
-        run: |
-          cd verifactu-bff
-          npm run typecheck --if-present
-      - name: Migraciones (si aplica)
-        run: |
-          cd verifactu-bff
-          npm run migration:run --if-present || true
-      - name: Tests unitarios
-        continue-on-error: true
-        run: |
-          cd verifactu-bff
-          npm test --if-present
+            - name: Instalar deps
+        run: npm ci
+        working-directory: verifactu-bff
 
+      - name: Lint
+        run: npm run lint --if-present
+        working-directory: verifactu-bff
+
+      - name: Tipos
+        run: npm run typecheck --if-present
+        working-directory: verifactu-bff
+
+      # Eliminamos "Tests unitarios" por ahora (no hay tests unitarios)
+      # y hacemos que los e2e SÍ bloqueen el pipeline.
       - name: Tests e2e (Nest + supertest)
-        continue-on-error: true
-        run: |
-          cd verifactu-bff
-          npm run test:e2e --if-present
+        run: npm run test:e2e
+        working-directory: verifactu-bff
 
   backend-connector:
     name: Backend Connector
