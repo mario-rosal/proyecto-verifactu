@@ -1,28 +1,36 @@
 # LOG del proyecto — VeriFactu
 
 > Bitácora única y fuente de verdad para IA y equipo. Mantener breve, factual y actualizada.  
-> **Última actualización:** 2025-08-22
+> **Última actualización:** 2025-08-23
 
 ---
 
+## North Star (cumplimiento)
+
+- **Inmutabilidad:** `event_log` e `invoice_record` son _append-only_ (triggers en BD).
+- **Trazabilidad:** hash SHA-256 encadenado en `invoice_record` (`hash_anterior` → `hash_actual`).
+- **Verificabilidad:** PDF con **QR** + leyenda **“VERI\*FACTU”** (pendiente de implementar endpoint `GET /invoices/:id/pdf`).
+
 ## TL;DR (para IA)
 
-- Producto: **Compliance as a Service** (Veri\*Factu), NO un ERP de facturación.
-- Stack: NestJS (TS) + PostgreSQL + TypeORM · n8n + Gemini · Frontend Vanilla+Tailwind · Electron (printer-connector).
+- Producto: **Compliance as a Service** (Veri\*Factu). **No** somos un ERP.
+- Stack: NestJS (TS) + PostgreSQL + TypeORM · n8n + Gemini · UI Vanilla+Tailwind · Electron (printer).
 - Monorepo: https://github.com/mario-rosal/proyecto-verifactu
-- CI: GitHub Actions. **BFF endurecido** (lint/types/e2e bloquean). Resto no bloquea aún.
-- Rama `main` protegida con status checks.
-- Salud: `GET /healthz` (BFF) con **test e2e**.
-- **EventLog (tabla `event_log`)**: `{ id: number; tenantId: number; eventType: string; details?: jsonb; createdAt: Date }`.
+- CI: **ligero** (lint/type/build no bloquean; e2e desactivados por ahora).
+- Salud BFF: `GET /healthz`.
+- `event_log` (BD snake_case) registra acciones; `invoice_record` guarda facturas selladas (NIF, serie, número, fecha, importes, **hashes**).
 
-**Misión del producto:** pasarela de cumplimiento **invisible** para PYMES: el usuario sigue usando su ERP/TPV/Word/Excel, el **conector** sube los PDFs con **API key**, y el **BFF** los transforma al formato requerido (QR/encabezados), registrando todo en `event_log` y mostrando el estado en el **dashboard**. _(Ver `docs/PRODUCT_CHARTER.md`)_.
+## Contrato de datos para el PDF
+
+Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`  
+(opcional visibles: `base_total`, `cuota_total`).
 
 ## Reglas de uso del LOG
 
-1. **Una línea por cambio** relevante (fecha + resumen + PR/commit si aplica).
-2. Si cambia una decisión → abrir ADR en `docs/DECISIONS.md`.
+1. **Una línea por cambio** (fecha + resumen + PR/commit si aplica).
+2. Si cambia una decisión → ADR en `docs/DECISIONS.md`.
 3. La IA debe leer **este LOG** (y `DECISIONS.md`) antes de proponer cambios.  
-   _Prioriza siempre lo más reciente de esta bitácora._
+   Prioriza siempre lo **más reciente** de esta bitácora.
 
 ---
 
