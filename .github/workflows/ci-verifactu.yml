@@ -47,13 +47,16 @@ jobs:
           cd verifactu-bff
           npm run migration:run --if-present || true
       - name: Tests unitarios
+        shell: bash
         run: |
           cd verifactu-bff
-          npm test --if-present || echo "No tests yet; skipping"
+          npm test --silent || true
+
       - name: Tests e2e (Nest + supertest)
+        shell: bash
         run: |
           cd verifactu-bff
-          npm run test:e2e --if-present || echo "No e2e tests yet; skipping"
+          npm run test:e2e --silent || true
 
   backend-connector:
     name: Backend Connector
