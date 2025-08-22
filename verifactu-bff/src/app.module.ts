@@ -14,9 +14,11 @@ import { AuthModule } from './auth/auth.module';
 import { User } from './entities/user.entity';
 import { ApiKey } from './entities/api-key.entity';
 import { EventLog } from './entities/event-log.entity'; // <-- 1. Importar la nueva entidad
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
+    HealthModule,
     AuthModule, // <-- El AuthModule está correctamente importado
     HttpModule,
     TypeOrmModule.forRoot({
