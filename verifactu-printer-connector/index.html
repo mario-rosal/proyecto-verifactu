@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
+    <title>Configuración - Conector VeriFactu</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 30px; background-color: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h1 { font-size: 1.8em; color: #1a202c; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; color: #4a5568; }
+        .path-display { background-color: #edf2f7; padding: 10px; border-radius: 6px; font-family: monospace; color: #2d3748; margin-top: 8px; word-wrap: break-word; }
+        button { padding: 10px 15px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background-color 0.2s ease-in-out; }
+        .btn-primary { background-color: #4299e1; color: white; }
+        .btn-primary:hover { background-color: #2b6cb0; }
+        .btn-secondary { background-color: #e2e8f0; color: #4a5568; }
+        .btn-secondary:hover { background-color: #cbd5e0; }
+        #statusMessage { margin-top: 20px; padding: 10px; border-radius: 6px; display: none; }
+        .status-success { background-color: #c6f6d5; color: #2f855a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Configuración del Conector</h1>
+        <form id="settingsForm">
+            <div class="form-group">
+                <label for="folderPath">Carpeta a Vigilar</label>
+                <button type="button" id="selectFolderBtn" class="btn-secondary">Seleccionar Carpeta</button>
+                <div id="folderPathDisplay" class="path-display">Ninguna carpeta seleccionada</div>
+            </div>
+            <button type="submit" class="btn-primary">Guardar Configuración</button>
+        </form>
+        <div id="statusMessage"></div>
+    </div>
+
+    <script>
+        const selectFolderBtn = document.getElementById('selectFolderBtn');
+        const folderPathDisplay = document.getElementById('folderPathDisplay');
+        const settingsForm = document.getElementById('settingsForm');
+        const statusMessage = document.getElementById('statusMessage');
+
+        // Al cargar la página, pedimos la configuración guardada
+        window.electronAPI.getSettings().then(settings => {
+            if (settings && settings.folderPath) {
+                folderPathDisplay.textContent = settings.folderPath;
+            }
+        });
+
+        // Manejar el clic para seleccionar una carpeta
+        selectFolderBtn.addEventListener('click', async () => {
+            const folderPath = await window.electronAPI.openFolderDialog();
+            if (folderPath) {
+                folderPathDisplay.textContent = folderPath;
+            }
+        });
+
+        // Manejar el envío del formulario
+        settingsForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const settings = {
+                folderPath: folderPathDisplay.textContent,
+            };
+            const result = await window.electronAPI.saveSettings(settings);
+            if (result && result.success) {
+                statusMessage.textContent = '¡Configuración guardada con éxito!';
+                statusMessage.className = 'status-success';
+                statusMessage.style.display = 'block';
+                setTimeout(() => {
+                    statusMessage.style.display = 'none';
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>

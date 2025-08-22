@@ -1,0 +1,37 @@
+﻿# Node/TS/Nest
+node_modules/
+dist/
+build/
+coverage/
+.nyc_output/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Entornos y secretos
+.env
+.env.*.local
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# IDE / SO
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Electron
+out/
+release/
+*.asar
+*.app
+*.exe
+
+# n8n (solo versiona /flows exportados)
+.n8n/
+
+# Otros
+*.zip
