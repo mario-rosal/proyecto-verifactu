@@ -17,7 +17,7 @@ jobs:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
           POSTGRES_DB: verifactu_test
-        ports: ['5432:5432']
+        ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U test"
           --health-interval 10s
@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
+        with: { node-version: "20" }
       - name: Instalar deps
         run: |
           cd verifactu-bff # <-- ajusta si tu ruta es distinta
@@ -66,7 +66,7 @@ jobs:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
           POSTGRES_DB: verifactu_test
-        ports: ['5432:5432']
+        ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U test"
           --health-interval 10s
@@ -78,7 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
+        with: { node-version: "20" }
       - name: Instalar deps
         run: |
           cd verifactu-connector # <-- ajusta ruta
@@ -98,10 +98,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
+        with: { node-version: "20" }
       - name: Lint y tests
         run: |
-          cd frontend # <-- ajusta ruta si aplica
+          cd verifactu-ui
           npm ci || true
           npm run lint --if-present
           npm test --if-present
@@ -112,10 +112,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
+        with: { node-version: "20" }
       - name: Lint y tests
         run: |
-          cd electron-app # <-- ajusta ruta
+          cd verifactu-printer-connector 
           npm ci || true
           npm run lint --if-present
           npm test --if-present
