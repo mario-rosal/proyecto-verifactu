@@ -53,7 +53,7 @@ jobs:
          npm test --if-present
 
       - name: Tests e2e (Nest + supertest)
-         continue-on-error: true
+        continue-on-error: true
         run: |
          cd verifactu-bff
          npm run test:e2e --if-present
