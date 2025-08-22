@@ -38,7 +38,7 @@ describe('GET /healthz (e2e)', () => {
       .expect(({ body }) => {
         expect(body).toHaveProperty('status', 'ok');
         // db puede ser "ok" o "ko" en real; aquí forzamos "ok" por el fake
-        expect(body).toHaveProperty('db', 'ok');
+        expect(body).toHaveProperty('db', 'ok'); // <- dejar 'ok'
       });
   });
 });
