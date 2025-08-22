@@ -1,7 +1,9 @@
 name: CI verifactu
+
 on:
   push:
   pull_request:
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -10,59 +12,8 @@ jobs:
   backend-bff:
     name: Backend BFF
     runs-on: ubuntu-latest
-    services:
-  postgres:
-    image: postgres:16
-    env:
-      POSTGRES_USER: test
-      POSTGRES_PASSWORD: test
-      POSTGRES_DB: verifactu_test
-     options: >-
-      --health-cmd "pg_isready -U test -d verifactu_test"
-      --health-interval 10s
-      --health-timeout 5s
-      --health-retries 10
-    env:
-  DATABASE_URL: postgres://test:test@postgres:5432/verifactu_test
-  NODE_ENV: test
-  PGUSER: test
-  PGPASSWORD: test
-  PGHOST: postgres
-  PGPORT: '5432'
-  PGDATABASE: verifactu_test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-      - name: Esperar a que la BD esté lista
-  run: |
-    sudo apt-get update >/dev/null
-    sudo apt-get install -y postgresql-client >/dev/null
-    until pg_isready -h postgres -U test -d verifactu_test; do sleep 1; done
-  env:
-    PGPASSWORD: test
-        with: { node-version: "20" }
-      - name: Instalar deps
-        run: npm ci
-        working-directory: verifactu-bff
 
-      - name: Lint
-        run: npm run lint --if-present
-        working-directory: verifactu-bff
-
-      - name: Tipos
-        run: npm run typecheck --if-present
-        working-directory: verifactu-bff
-
-      # Eliminamos "Tests unitarios" por ahora (no hay tests unitarios)
-      # y hacemos que los e2e SÍ bloqueen el pipeline.
-      - name: Tests e2e (Nest + supertest)
-        run: npm run test:e2e
-        working-directory: verifactu-bff
-
-  backend-connector:
-    name: Backend Connector
-    runs-on: ubuntu-latest
-    needs: backend-bff
+    # Postgres para los tests e2e del BFF
     services:
       postgres:
         image: postgres:16
@@ -70,45 +21,96 @@ jobs:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
           POSTGRES_DB: verifactu_test
-        ports: ["5432:5432"]
+        # No exponemos puertos; nos conectamos por el nombre del servicio "postgres"
         options: >-
-          --health-cmd "pg_isready -U test"
+          --health-cmd "pg_isready -U test -d verifactu_test"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+
+    # Forzamos las credenciales/host que usa el BFF en los tests
     env:
-      DATABASE_URL: postgres://test:test@localhost:5432/verifactu_test
+      DATABASE_URL: postgres://test:test@postgres:5432/verifactu_test
       NODE_ENV: test
+      PGUSER: test
+      PGPASSWORD: test
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: verifactu_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Espera explícita a que la BD esté sana antes de lanzar el app/test
+      - name: Esperar a que la BD esté lista
+        run: |
+          sudo apt-get update >/dev/null
+          sudo apt-get install -y postgresql-client >/dev/null
+          until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE"; do sleep 1; done
+
+      - name: Instalar deps
+        working-directory: verifactu-bff
+        run: npm ci
+
+      - name: Lint
+        working-directory: verifactu-bff
+        run: npm run lint --if-present
+
+      - name: Tipos
+        working-directory: verifactu-bff
+        run: npm run typecheck --if-present
+
+      - name: Migraciones (si aplica)
+        working-directory: verifactu-bff
+        run: npm run migration:run --if-present || true
+
+      - name: Tests e2e (Nest + supertest)
+        working-directory: verifactu-bff
+        run: npm run test:e2e
+
+  backend-connector:
+    name: Backend Connector
+    runs-on: ubuntu-latest
+    needs: backend-bff
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: "20"
+
       - name: Instalar deps
-        run: |
-          cd verifactu-connector # <-- ajusta ruta
-          npm ci
-      - name: Lint
-        run: npm run lint --if-present
         working-directory: verifactu-connector
+        run: npm ci
+
+      - name: Lint
+        working-directory: verifactu-connector
+        run: npm run lint --if-present
         continue-on-error: true
 
       - name: Tipos
-        run: npm run typecheck --if-present
         working-directory: verifactu-connector
+        run: npm run typecheck --if-present
         continue-on-error: true
 
       - name: Tests
-        run: npm test --if-present
         working-directory: verifactu-connector
+        run: npm test --if-present
         continue-on-error: true
 
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: "20"
 
       - name: No Node steps (no package.json)
         if: ${{ hashFiles('verifactu-ui/package.json') == '' }}
@@ -116,28 +118,30 @@ jobs:
 
       - name: Install deps
         if: ${{ hashFiles('verifactu-ui/package.json') != '' }}
-        run: npm ci
         working-directory: verifactu-ui
+        run: npm ci
 
       - name: Lint
         if: ${{ hashFiles('verifactu-ui/package.json') != '' }}
-        run: npm run lint --if-present
         working-directory: verifactu-ui
+        run: npm run lint --if-present
         continue-on-error: true
 
       - name: Tests
         if: ${{ hashFiles('verifactu-ui/package.json') != '' }}
-        run: npm test --if-present
         working-directory: verifactu-ui
+        run: npm test --if-present
         continue-on-error: true
 
   electron:
     name: Electron
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: "20"
 
       - name: No Node steps (no package.json)
         if: ${{ hashFiles('verifactu-printer-connector/package.json') == '' }}
@@ -145,17 +149,17 @@ jobs:
 
       - name: Install deps
         if: ${{ hashFiles('verifactu-printer-connector/package.json') != '' }}
-        run: npm ci
         working-directory: verifactu-printer-connector
+        run: npm ci
 
       - name: Lint
         if: ${{ hashFiles('verifactu-printer-connector/package.json') != '' }}
-        run: npm run lint --if-present
         working-directory: verifactu-printer-connector
+        run: npm run lint --if-present
         continue-on-error: true
 
       - name: Tests
         if: ${{ hashFiles('verifactu-printer-connector/package.json') != '' }}
-        run: npm test --if-present
         working-directory: verifactu-printer-connector
+        run: npm test --if-present
         continue-on-error: true
