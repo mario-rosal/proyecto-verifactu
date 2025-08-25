@@ -125,27 +125,26 @@
 
             // --- 1. VERIFICACIÓN DE SEGURIDAD ---
             const accessToken = localStorage.getItem('accessToken');
-            if (!accessToken) {
-                // Si no hay token, no hay acceso. Redirigimos al login.
+            if (!accessToken) { // <-- Si falta el token, fuera
+                // Limpiamos por si acaso
+                localStorage.removeItem('accessToken');
                 window.location.href = './login.html';
-                return; // Detenemos la ejecución del script
+                return; 
             }
 
             // --- 2. LÓGICA DE CERRAR SESIÓN ---
             logoutButton.addEventListener('click', () => {
                 localStorage.removeItem('accessToken');
+                
                 window.location.href = './login.html';
             });
 
             // --- 3. OBTENCIÓN DE DATOS SEGUROS ---
             const fetchDashboardData = async () => {
                 try {
-                    // Ahora enviamos el token en la cabecera de autorización
                     const response = await fetch(`${bffBaseUrl}/v1/dashboard`, {
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`
-                        }
-                    });
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
                     
                     if (response.status === 401) {
                         // Si el token es inválido o ha expirado, redirigimos al login

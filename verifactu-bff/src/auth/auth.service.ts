@@ -5,11 +5,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from '../entities/user.entity';
 import { Tenant } from '../entities/tenant.entity';
-import { ApiKey } from '../entities/api-key.entity'; // <-- 1. Importar ApiKey
+import { ApiKey } from '../entities/api-key.entity'; // <-- solo ApiKey; ya no usamos ApiKeyType
 import { RegisterDto, LoginDto } from '../dto/auth.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { randomBytes, createHash } from 'crypto'; // <-- 2. Importar createHash
+import { randomBytes, createHash } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -18,34 +18,52 @@ export class AuthService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
-    @InjectRepository(ApiKey) // <-- 3. Inyectar el repositorio de ApiKey
+    @InjectRepository(ApiKey)
     private readonly apiKeyRepository: Repository<ApiKey>,
     private readonly jwtService: JwtService,
   ) {}
 
-  // --- 👇 NUEVA LÓGICA PARA VALIDAR LA API KEY 👇 ---
-  async validateApiKey(apiKey: string) {
-    // 1. Hashear la clave recibida para poder compararla
+  // --- 👇 LÓGICA MEJORADA PARA VALIDAR LA API KEY 👇 ---
+  async validateApiKey(apiKey: string): Promise<{ tenantId: string; tenantNif: string }> {
     const keyHash = createHash('sha256').update(apiKey).digest('hex');
-
-    // 2. Buscar el hash en la base de datos
     const apiKeyRecord = await this.apiKeyRepository.findOne({
-      where: { keyHash: keyHash, isActive: true },
-      relations: ['tenant'], // Cargamos la información del tenant asociado
+      where: { keyHash, isActive: true },
+      relations: ['tenant'],
     });
 
-    // 3. Si no se encuentra o no está activa, denegar acceso
     if (!apiKeyRecord) {
       throw new UnauthorizedException('API Key inválida o revocada.');
     }
 
-    // 4. Si es válida, devolver la información del tenant
-    // Esto es crucial para que n8n sepa para quién está trabajando.
+    // (sin expiración por columna inexistente en BD)
+    
+    // Actualizar la fecha de último uso (opcional, bueno para auditoría)
+    this.apiKeyRepository.update(apiKeyRecord.id, { lastUsedAt: new Date() });
+
     return {
-      tenantId: apiKeyRecord.tenant.id,
+      tenantId: String(apiKeyRecord.tenant.id),
       tenantNif: apiKeyRecord.tenant.nif,
     };
   }
+
+  // --- 👇 NUEVO MÉTODO PRIVADO PARA GENERAR API KEYS TEMPORALES 👇 ---
+  private async _generateAndSaveTemporaryApiKey(tenant: Tenant): Promise<string> {
+    const newApiKey = randomBytes(24).toString('hex');
+    const keyPrefix = newApiKey.substring(0, 8);
+    const keyHash = createHash('sha256').update(newApiKey).digest('hex');
+    
+    const apiKeyEntity = this.apiKeyRepository.create({
+      keyHash,
+      keyPrefix,
+      tenant,
+      isActive: true,
+    });
+
+    await this.apiKeyRepository.save(apiKeyEntity);
+
+    return newApiKey;
+  }
+
   async register(registerDto: RegisterDto) {
     const tenant = await this.tenantRepository.findOneBy({ id: registerDto.tenantId });
     if (!tenant) {
@@ -94,57 +112,48 @@ export class AuthService {
         tenantId: user.tenant.id 
     };
     
+    // --- 👇 GENERAR Y DEVOLVER API KEY TEMPORAL JUNTO AL TOKEN 👇 ---
+    const temporaryApiKey = await this._generateAndSaveTemporaryApiKey(user.tenant);
+
     return {
       access_token: await this.jwtService.signAsync(payload),
+      api_key: temporaryApiKey, // El cliente la usará para las siguientes peticiones
     };
   }
 
-  // --- 👇 NUEVA LÓGICA PARA SOLICITAR EL RESETEO 👇 ---
   async forgotPassword(email: string) {
     const user = await this.userRepository.findOneBy({ email });
     if (!user) {
-      // Por seguridad, no revelamos si el usuario existe o no.
-      // Simplemente devolvemos un mensaje genérico.
       return { message: 'Si tu email está registrado, recibirás un enlace para restablecer tu contraseña.' };
     }
 
-    // 1. Generar un token seguro y aleatorio
     const token = randomBytes(32).toString('hex');
     user.passwordResetToken = token;
 
-    // 2. Establecer una fecha de caducidad (ej. 1 hora)
     const oneHour = 60 * 60 * 1000;
     user.resetTokenExpires = new Date(Date.now() + oneHour);
 
     await this.userRepository.save(user);
 
-    // 3. (Futuro) Activar el workflow de n8n para enviar el email
-    // Por ahora, solo devolvemos el token para poder probarlo.
     console.log(`Token de reseteo para ${email}: ${token}`);
     
     return { message: 'Si tu email está registrado, recibirás un enlace para restablecer tu contraseña.' };
   }
 
-  // --- 👇 NUEVA LÓGICA PARA CONFIRMAR EL RESETEO 👇 ---
   async resetPassword(token: string, newPassword: string) {
-    // 1. Buscar al usuario por el token y comprobar que no ha caducado
     const user = await this.userRepository.findOne({
       where: {
         passwordResetToken: token,
-        // resetTokenExpires: MoreThan(new Date()) // TypeORM puede hacer esto directamente
       },
     });
 
-    // Comprobación manual de la fecha por simplicidad
     if (!user || user.resetTokenExpires < new Date()) {
       throw new BadRequestException('El token es inválido o ha expirado.');
     }
 
-    // 2. Encriptar la nueva contraseña
     const salt = await bcrypt.genSalt();
     user.passwordHash = await bcrypt.hash(newPassword, salt);
 
-    // 3. Limpiar los campos de reseteo
     user.passwordResetToken = null;
     user.resetTokenExpires = null;
 

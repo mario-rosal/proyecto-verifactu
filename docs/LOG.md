@@ -1,3 +1,18 @@
+### 2025-08-25 — End-to-end Onboarding con ApiKeyGuard y front sin API-Key
+- Se consolida **ApiKeyGuard global** con lógica **JWT OR x-api-key**:
+  - Permite sin API key: `OPTIONS`, `/healthz`, `POST /v1/auth/login`, `GET /v1/jobs/:id`.
+  - Si llega `Authorization: Bearer ...`, deja pasar (JWT se valida por su guard/estrategia).
+  - Si no hay JWT, exige `x-api-key` y resuelve `tenant` vía `AuthService.validateApiKey`.
+- **Front (`index.html`, `login.html`, `dashboard.html`)**: se quita la `x-api-key` hardcodeada. El navegador usa **solo JWT**.
+- **n8n** mantiene `x-api-key` (server-to-server). No se exponen secrets al front.
+- **Entidad `ApiKey`** alineada a BD (sin columnas no existentes: `type`, `expires_at`).
+- **AuthService**:
+  - `validateApiKey` ya no depende de columnas inexistentes.
+  - `tenantId` devuelto como `string` (evita TS2322).
+- **Sin migraciones** ni cambios de CI. Próximo ajuste sugerido: si se requiere expiración real de API keys, añadir columna `expires_at` con **migración** y reintroducir la validación.
+
+## (entradas anteriores)…
+
 # LOG del proyecto — VeriFactu
 
 > Bitácora única y fuente de verdad para IA y equipo. Mantener breve, factual y actualizada.  
@@ -31,6 +46,8 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 2. Si cambia una decisión → ADR en `docs/DECISIONS.md`.
 3. La IA debe leer **este LOG** (y `DECISIONS.md`) antes de proponer cambios.  
    Prioriza siempre lo **más reciente** de esta bitácora.
+4. Intenta leer el repo público y los archivos relevantes.
+   Si GitHub no me muestra el fichero, te pido que lo adjuntes aquí y sigo con un diff mínimo y seguro. Nada de suposiciones.
 
 ---
 

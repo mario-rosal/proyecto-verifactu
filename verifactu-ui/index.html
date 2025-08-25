@@ -133,7 +133,7 @@
         const pollJobStatus = (jobId) => {
             const intervalId = setInterval(async () => {
                 try {
-                    const response = await fetch(`${bffBaseUrl}/v1/jobs/${jobId}`);
+                                        const response = await fetch(`${bffBaseUrl}/v1/jobs/${jobId}`);
                     if (!response.ok) throw new Error('No se pudo consultar el estado del trabajo.');
                     const job = await response.json();
 

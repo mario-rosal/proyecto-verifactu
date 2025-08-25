@@ -3,33 +3,39 @@ import { AuthService } from './auth.service';
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
-  // Usamos el token AuthService para la inyección, pero tipamos como any para no romper si cambia la firma
   constructor(@Inject(AuthService) private readonly authService: any) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
-
-    // Permitir /healthz sin API key para pruebas y monitorización
+    const method: string = (req.method || '').toUpperCase();
     const path: string = req.path || req.url || '';
-    if (path === '/healthz') {
+
+    // 1) Whitelist mínimos: preflight, health, login y polling de jobs (onboarding)
+    if (method === 'OPTIONS') return true;            // CORS preflight
+    if (path === '/healthz') return true;             // health
+    if (method === 'POST' && path === '/v1/auth/login') return true; // login sin JWT aún
+    if (method === 'GET' && /^\/v1\/jobs\/[0-9a-fA-F-]{36}$/.test(path)) return true; // polling desde navegador
+
+    // 2) Si llega JWT Bearer, dejamos pasar; el guard de JWT hará su parte
+    const authHeader: string | undefined =
+      req.headers['authorization'] || req.headers['Authorization'];
+    if (authHeader && /^Bearer\s+/.test(String(authHeader))) {
       return true;
     }
 
-    const apiKey = (req.headers['x-api-key'] as string) || undefined;
+    // 3) Si no hay JWT, exigimos API-Key válida (server-to-server)
+    const apiKey = req.headers['x-api-key'] || req.headers['X-API-KEY'];
     if (!apiKey) return false;
 
-    // Si AuthService expone validateApiKey, úsalo; si no, deniega
+    // 4) Validar API key con AuthService
     if (this.authService && typeof this.authService.validateApiKey === 'function') {
       const tenant = await this.authService.validateApiKey(apiKey);
-      if (tenant) {
-        // Adjunta tenant a la request para capas posteriores
-        (req as any).tenant = tenant;
-        return true;
-      }
-      return false;
+      if (!tenant) return false;
+      (req as any).tenant = tenant; // adjuntar tenant
+      return true;
     }
 
-    // Si no hay método de validación disponible, por seguridad denegamos
+    // 5) Por seguridad, denegar si no pudimos validar
     return false;
   }
 }
