@@ -169,3 +169,11 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 - [ ] Connector: definir DTOs/Tipos en `src/aeat/aeat.service.ts` y eliminar `any` (o bajar severidad ESLint temporalmente).
 - [ ] Frontend/Electron: añadir `package.json` y scripts `lint`/`test` para activar checks reales en CI.
 - [ ] n8n: versionar flujos en `verifactu-flows/*.json` y documentar en `flows/README.md`.
+
+## 2025-08-26 — Sprint E: endpoint POST /invoices/:id/pdf/stamp
+
+- BFF: implementado endpoint `POST /invoices/:id/pdf/stamp` protegido con ApiKeyGuard.
+- Entrada: `multipart/form-data` con campo `file` (PDF original).
+- Salida: PDF original con **overlay** de leyenda “VERI*FACTU — Factura verificable en la sede electrónica de la AEAT” + QR en esquina superior derecha.
+- QR codifica URL con campos de `invoice_record` (`emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`).
+- QA: probado con `curl`, verificado PDF resultante correcto.
