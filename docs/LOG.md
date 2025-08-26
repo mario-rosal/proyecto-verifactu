@@ -53,6 +53,8 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 
 ## Entradas (más reciente primero)
 
+## 2025-08-26 — Fix “seal-invoice”: validaciones y coerción numérica en BFF; ajuste n8n para numero_factura con guion; Job actualiza a COMPLETED/FAILED.
+
 ## 2025-08-26 — Fase B — Onboarding: Conector Electron + n8n (✅)
 
 - **Estado:** completado. El conector **lee/guarda** `config.json` (API key real + carpeta), arranca watcher y muestra logs:  

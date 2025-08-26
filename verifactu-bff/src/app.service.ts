@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, InternalServerErrorException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, InternalServerErrorException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Job, JobType, JobStatus } from './entities/job.entity';
@@ -176,40 +176,82 @@ async logEvent(tenantId: number, createEventDto: CreateEventDto) {
             throw new InternalServerErrorException(`No se encontraron datos en el trabajo ${jobId}`);
         }
 
-        const invoiceData = job.payload as CreateInvoiceDto;
-        const tenant = await this.findTenantByNif(invoiceData.emisorNif);
-        if (!tenant) {
-            throw new NotFoundException(`Tenant no encontrado para el emisor ${invoiceData.emisorNif}`);
+        try {
+            const dto = job.payload as CreateInvoiceDto;
+
+            // Validaciones mínimas de campos requeridos
+            if (!dto.emisorNif) throw new BadRequestException('Falta emisorNif');
+            if (!dto.serie) throw new BadRequestException('Falta serie');
+            if (!dto.numero) throw new BadRequestException('Falta numero');
+            if (!dto.fechaEmision) throw new BadRequestException('Falta fechaEmision');
+            if (!dto.totales) throw new BadRequestException('Faltan totales');
+            if (!dto.receptor?.idFiscal) throw new BadRequestException('Falta receptor.idFiscal');
+
+            const tenant = await this.findTenantByNif(dto.emisorNif);
+            if (!tenant) {
+                throw new NotFoundException(`Tenant no encontrado para el emisor ${dto.emisorNif}`);
+            }
+
+            // Coerción/normalización de números (evita .toFixed sobre string/undefined)
+            const base  = this.coerceNumber((dto as any).totales?.base,  'totales.base');
+            const iva   = this.coerceNumber((dto as any).totales?.iva,   'totales.iva');
+            const total = this.coerceNumber((dto as any).totales?.total, 'totales.total');
+
+            const ultimoRegistro = await this.invoiceRecordRepository.findOne({
+                where: { tenant: { id: tenant.id } },
+                order: { createdAt: 'DESC' },
+            });
+            const hashAnterior = ultimoRegistro ? ultimoRegistro.hashActual : '0'.repeat(64);
+
+            // Solo usamos los campos necesarios para el hash, ya normalizados
+            const dtoParaHash = {
+                emisorNif: dto.emisorNif,
+                serie: dto.serie,
+                numero: dto.numero,
+                fechaEmision: dto.fechaEmision,
+                totales: { base, iva, total },
+            } as unknown as CreateInvoiceDto;
+            const hashActual = this.calculateChainedHash(dtoParaHash, hashAnterior);
+
+            const nuevoRegistro = this.invoiceRecordRepository.create({
+                tenant,
+                tipo: dto.tipo,
+                serie: dto.serie,
+                numero: dto.numero,
+                fechaEmision: dto.fechaEmision,
+                emisorNif: dto.emisorNif,
+                receptorNif: dto.receptor.idFiscal,
+                baseTotal: base,
+                cuotaTotal: iva,
+                importeTotal: total,
+                desgloseIva: dto.lineas,
+                hashActual,
+                hashAnterior,
+                estadoAeat: 'PENDING',
+            });
+
+            const savedRecord = await this.invoiceRecordRepository.save(nuevoRegistro);
+
+            // Actualizar estado del Job a COMPLETED con resultado útil
+            await this.updateJob(jobId, {
+                status: JobStatus.COMPLETED as any,
+                result: { invoiceRecordId: savedRecord.id, hashActual },
+            } as UpdateJobDto);
+
+            this.logger.log(`Factura ${savedRecord.id} sellada y guardada con éxito.`);
+            return savedRecord;
+        } catch (err: any) {
+            // Best-effort: marcar el Job como FAILED
+            try {
+                await this.updateJob(jobId, {
+                    status: JobStatus.FAILED as any,
+                    errorMessage: err?.message ?? 'Error al finalizar y sellar la factura',
+                } as UpdateJobDto);
+            } catch (e: any) {
+                this.logger.error(`No se pudo actualizar el estado del Job ${jobId} a FAILED: ${e?.message}`);
+            }
+            throw err;
         }
-
-        const ultimoRegistro = await this.invoiceRecordRepository.findOne({
-            where: { tenant: { id: tenant.id } },
-            order: { createdAt: 'DESC' },
-        });
-        const hashAnterior = ultimoRegistro ? ultimoRegistro.hashActual : '0'.repeat(64);
-
-        const hashActual = this.calculateChainedHash(invoiceData, hashAnterior);
-
-        const nuevoRegistro = this.invoiceRecordRepository.create({
-            tenant: tenant,
-            tipo: invoiceData.tipo,
-            serie: invoiceData.serie,
-            numero: invoiceData.numero,
-            fechaEmision: invoiceData.fechaEmision,
-            emisorNif: invoiceData.emisorNif,
-            receptorNif: invoiceData.receptor.idFiscal,
-            baseTotal: invoiceData.totales.base,
-            cuotaTotal: invoiceData.totales.iva,
-            importeTotal: invoiceData.totales.total,
-            desgloseIva: invoiceData.lineas,
-            hashActual: hashActual,
-            hashAnterior: hashAnterior,
-            estadoAeat: 'PENDING',
-        });
-
-        const savedRecord = await this.invoiceRecordRepository.save(nuevoRegistro);
-        this.logger.log(`Factura ${savedRecord.id} sellada y guardada con éxito.`);
-        return savedRecord;
     }
 
     // --- Lógica de gestión de Dashboard ---
@@ -254,6 +296,18 @@ async logEvent(tenantId: number, createEventDto: CreateEventDto) {
 
     async findTenantByNif(nif: string): Promise<Tenant | null> {
         return this.tenantRepository.findOne({ where: { nif } });
+    }
+
+    // Coerción robusta de numéricos (admite strings y coma decimal)
+    private coerceNumber(value: any, fieldName: string): number {
+        if (typeof value === 'string') {
+            value = value.trim().replace(',', '.');
+        }
+        const num = typeof value === 'number' ? value : Number(value);
+        if (!Number.isFinite(num)) {
+            throw new BadRequestException(`Campo numérico inválido: ${fieldName}`);
+        }
+        return num;
     }
 
     // --- Función Auxiliar para Calcular Hash ---
