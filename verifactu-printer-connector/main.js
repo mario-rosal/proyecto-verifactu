@@ -42,6 +42,9 @@ function startWatcher() {
     ignored: /^\./,
     persistent: true,
     ignoreInitial: true,
+    depth: 0,
+    // Evita procesar archivos “a medio escribir” (Windows/Explorer, impresoras virtuales, etc.)
+    awaitWriteFinish: { stabilityThreshold: 1500, pollInterval: 250 },
   });
 
   // --- LÓGICA DE ENVÍO ---
@@ -68,31 +71,43 @@ function startWatcher() {
       return;
     }
 
-    try {
-      const fileBuffer = fs.readFileSync(filePath);
-      const formData = new FormData();
-      formData.append('file', new Blob([fileBuffer]), path.basename(filePath));
+    const sendWithRetry = async (attempt = 1) => {
+      try {
+        console.log(`[Envío] Enviando ${path.basename(filePath)} a n8n... (intento ${attempt})`);
+        const fileBuffer = fs.readFileSync(filePath);
+        const formData = new FormData();
+        formData.append('file', new Blob([fileBuffer]), path.basename(filePath));
 
-      console.log(`[Envío] Enviando ${path.basename(filePath)} a n8n...`);
+        await axios.post(n8nWebhookUrl, formData, {
+          headers: {
+            'X-API-KEY': apiKey,
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 15000,
+        });
 
-      await axios.post(n8nWebhookUrl, formData, {
-        headers: {
-          'X-API-KEY': apiKey,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      console.log(`[Envío] Archivo ${path.basename(filePath)} enviado con éxito.`);
-      dialog.showMessageBox({
-        type: 'info',
-        title: 'Factura Enviada',
-        message: `La factura ${path.basename(filePath)} se ha enviado para ser procesada.`
-      });
-
-    } catch (error) {
-      console.error('[Envío] Error al enviar el archivo:', error.message);
-      dialog.showErrorBox('Error de Envío', `No se pudo enviar la factura. Error: ${error.message}`);
-    }
+        console.log(`[Envío] Archivo ${path.basename(filePath)} enviado con éxito.`);
+        dialog.showMessageBox({
+          type: 'info',
+          title: 'Factura Enviada',
+          message: `La factura ${path.basename(filePath)} se ha enviado para ser procesada.`
+        });
+      } catch (error) {
+        const max = 3;
+        if (attempt < max) {
+          const backoff = attempt * 1500;
+          console.warn(`[Envío] Error (intento ${attempt}): ${error.code || error.message}. Reintento en ${backoff}ms…`);
+          setTimeout(() => sendWithRetry(attempt + 1), backoff);
+        } else {
+          console.error(`[Envío] Fallo definitivo al enviar ${path.basename(filePath)}:`, {
+            code: error.code,
+            status: error.response?.status,
+          });
+          dialog.showErrorBox('Error de Envío', `No se pudo enviar la factura. Error: ${error.message}`);
+        }
+      }
+    };
+    await sendWithRetry();
   });
   watcher.on('error', (error) => console.error(`[Chokidar] Error: ${error}`));
 }

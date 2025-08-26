@@ -16,7 +16,7 @@
 # LOG del proyecto — VeriFactu
 
 > Bitácora única y fuente de verdad para IA y equipo. Mantener breve, factual y actualizada.  
-> **Última actualización:** 2025-08-23
+> **Última actualización:** 2025-08-26
 
 ---
 
@@ -52,6 +52,23 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 ---
 
 ## Entradas (más reciente primero)
+
+## 2025-08-26 — Fase B — Onboarding: Conector Electron + n8n (✅)
+
+- **Estado:** completado. El conector **lee/guarda** `config.json` (API key real + carpeta), arranca watcher y muestra logs:  
+  `[Chokidar] Vigilando la carpeta: <path>`, `Nuevo archivo detectado: <file>`, `[Envío] Enviando <file> a n8n...`, `[Envío] Archivo <file> enviado con éxito.`
+- **n8n (ajustes mínimos):**
+  - Tras el **Webhook**, `Edit Fields (manual)` crea `ctx.apiKey` (String) desde `headers['x-api-key']` **normalizada** (sin CR/LF, `trim()`).
+  - Todos los **HTTP Request** al BFF envían header `x-api-key = {{$json.ctx.apiKey}}`.
+  - IF de validación usa **`$node["Validar API Key en BFF"].json.error is empty`** (no `item.error`).
+  - En el **Execute Workflow** hacia el subflujo se **incluyen** `jobId` y `ctx.apiKey` para que el subflujo use `{{$json.ctx.apiKey}}` en sus headers.
+- **Incidencias resueltas:**
+  - **403 Forbidden** por no enviar `x-api-key` en header → se envía desde n8n.
+  - **TypeError [ERR_INVALID_CHAR]** por `
+` en la key → se limpia al construir `ctx.apiKey`.
+  - **ECONNREFUSED host.docker.internal:3001** → servicio BFF no estaba levantado; al iniciar, queda operativo. (Recomendación: en Docker usar `http://verifactu-bff:3001`).
+- **Observación:** Puede aparecer error de envío si el PDF está aún “en escritura” (Windows). **Pendiente** decidir si aplicar `awaitWriteFinish + reintentos` en el watcher (no aplicado en repo).
+- **Siguiente fase (C):** Procesamiento de la primera factura → foco en **finalizar y sellar** (módulo `verifactu-connector` + simulador AEAT).
 
 ## 2025-08-22 — Tests e2e append-only
 
