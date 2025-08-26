@@ -24,7 +24,7 @@
 
 - **Inmutabilidad:** `event_log` e `invoice_record` son _append-only_ (triggers en BD).
 - **Trazabilidad:** hash SHA-256 encadenado en `invoice_record` (`hash_anterior` → `hash_actual`).
-- **Verificabilidad:** PDF con **QR** + leyenda **“VERI\*FACTU”** (pendiente de implementar endpoint `GET /invoices/:id/pdf`).
+- **Verificabilidad:** PDF con **QR** + leyenda **“VERI\*FACTU”** (endpoint `GET /invoices/:id/pdf` implementado en BFF).
 
 ## TL;DR (para IA)
 
@@ -52,6 +52,20 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 ---
 
 ## Entradas (más reciente primero)
+
+## 2025-08-26 — Fase D: PDF con QR + “VERI*FACTU” (BFF)
+
+- **Endpoint BFF**: `GET /invoices/:id/pdf` (sin prefijo de versión).
+- **Salida**: `200 OK`, `Content-Type: application/pdf`, `Content-Disposition: inline; filename="verifactu-<serie>-<numero>.pdf"`.
+- **Contenido PDF A4** (`pdf-lib` + `qrcode`):
+  - Leyenda visible: **“VERI*FACTU — Factura verificable en la sede electrónica de la AEAT”** (cabecera y pie).
+  - **QR** que codifica URL útil:
+    `https://verifactu.local/verify?nif=<emisor_nif>&serie=<serie>&numero=<numero>&fecha=<YYYY-MM-DD>&total=<importe_total_2d>&hash=<hash_actual>`.
+  - **hash_actual** impreso de forma visible.
+- **Contrato de datos** usado tal cual de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`
+  (opcionales: `base_total`, `cuota_total`).
+- **Errores**: `404` si no existe el registro; `422` si existe pero **sin** `hash_actual`.
+- **Alcance**: sin migraciones, sin cambios de CI ni de guards.
 
 ## 2025-08-26 — Fix “seal-invoice”: validaciones y coerción numérica en BFF; ajuste n8n para numero_factura con guion; Job actualiza a COMPLETED/FAILED.
 
