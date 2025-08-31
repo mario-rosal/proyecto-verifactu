@@ -46,6 +46,14 @@ export class AppController {
     return this.appService.createJob(createJobDto);
   }
 
+  // --- Confirmación AEAT desde el conector / n8n ---
+  @UseGuards(ApiKeyGuard)
+  @Post('invoices/:id/confirm')
+  confirmInvoice(@Param('id') id: string, @Body() body: any, @Request() req) {
+    const tenantId = req.tenant.id;
+    return this.appService.confirmInvoice(tenantId, id, body);
+  }
+
   @Patch('jobs/:id')
   updateJobStatus(@Param('id', new ParseUUIDPipe()) id: string, @Body() updateJobDto: UpdateJobDto) {
     return this.appService.updateJob(id, updateJobDto);

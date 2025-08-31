@@ -46,6 +46,57 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Sprint 4 (Seguridad y Acceso): Se implementó el sistema de autenticación de usuarios de principio a fin: la tabla users con roles, los endpoints de registro y login con JWT, el AuthGuard para proteger rutas y el flujo completo de recuperación de contraseña.
    Sprint 5 (El Conector Disruptivo): Se construyó y depuró la aplicación de escritorio "Impresora Virtual" con Electron. Se validó la arquitectura de comunicación segura (preload script) y se implementó la lógica para vigilar una carpeta y enviar los archivos a n8n con una API Key pre-configurada.
    Sprint 6 (Cumplimiento Avanzado): Se añadieron las capas finales de cumplimiento normativo, destacando la implementación del "Libro de Incidencias" (la tabla event_log y los endpoints correspondientes en el bff).
+
+   Sprint E (Sellado Visual de Facturas): Se implementó en el BFF el endpoint `POST /invoices/:id/pdf/stamp`, protegido con ApiKeyGuard. Este servicio recibe un PDF original en `multipart/form-data` y devuelve el mismo documento con un overlay de la leyenda “VERI*FACTU — Factura verificable en la sede electrónica de la AEAT” en cabecera y pie, junto con un código QR en la esquina superior derecha. El QR codifica la URL de verificación con los campos de `invoice_record` (`emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`). Se verificó mediante pruebas con `curl` que el PDF resultante conserva el contenido original y cumple el contrato de datos definido.
+
+   Sprint F (Disponibilidad del PDF sellado en el Dashboard): Se implementó en el BFF el endpoint `GET /invoices/:id/pdf/stamped`, que permite a los clientes descargar directamente la factura oficial Veri*Factu desde su Dashboard. El sistema guarda los PDFs originales y sellados en un bucket S3-compatible (MinIO en desarrollo, Amazon S3 en producción). El flujo de n8n, al marcar una factura como “sellada”, llama al BFF para estampar el PDF y almacenarlo en la ruta `stamped/<invoice_id>.pdf`. El Dashboard incorpora un botón “Descargar Factura Veri*Factu (PDF)” que llama a este endpoint y entrega al cliente el documento oficial con leyenda y QR. Si el PDF aún no está disponible, se muestra el estado “En preparación”. El QR sigue codificando la URL de verificación con los campos de `invoice_record` (`emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`).
+
+   Diagrama del flujo completo:
+
+   ```
+   [ERP/TPV Antiguo] 
+           │ (Imprimir PDF)
+           ▼
+   [Conector Electron]
+    (watcher + API Key)
+           │
+           ▼
+     [Webhook n8n]
+           │
+           ├─ OCR / IA (Gemini) → Datos estructurados
+           │
+           └─► BFF /invoices (Job: INVOICE_SUBMISSION)
+                     │
+                     ▼
+              [invoice_record DB]
+                     │
+                     └─ Encadenado con hash
+                     │
+                     ▼
+           ┌───────────────────────────────┐
+           │ Sprint E:                     │
+           │ BFF /invoices/:id/pdf/stamp   │
+           │ Genera PDF con QR + leyenda   │
+           └───────────────────────────────┘
+                     │
+                     ▼
+           ┌───────────────────────────────┐
+           │ Sprint F:                     │
+           │ Guardar PDF en S3/MinIO       │
+           │ (stamped/<invoice_id>.pdf)    │
+           └───────────────────────────────┘
+                     │
+                     ▼
+            [Dashboard del Cliente]
+           ┌───────────────────────────────┐
+           │ GET /invoices/:id/pdf/stamped │
+           │ Botón “Descargar Factura”     │
+           └───────────────────────────────┘
+                     │
+                     ▼
+             [PDF Oficial Veri*Factu]
+    (contenido original + sello + QR verificable)
+   ```
 4. El "Hacia Dónde": Próximos Pasos
    Con el desarrollo funcional principal ya completado, el proyecto entra en su fase final de preparación para el lanzamiento.
    Generación del Documento Final: El siguiente gran paso es implementar la generación del PDF oficial de la factura, que incluya el código QR y la leyenda "VERI\*FACTU". Esto se hará en un nuevo flujo de n8n que tomará los datos de la factura ya sellada.

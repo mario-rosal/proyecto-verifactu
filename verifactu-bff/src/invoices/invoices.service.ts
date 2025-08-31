@@ -5,6 +5,8 @@ import { InvoiceRecord } from '../entities/invoice_record.entity';
 import { stampInvoicePdf, buildVerificationUrl } from './pdf-stamp.util';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import * as QRCode from 'qrcode';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class InvoicesService {
@@ -31,9 +33,13 @@ export class InvoicesService {
       throw new UnprocessableEntityException('invoice_record lacks hash_actual');
     }
 
-    const stamped = await stampInvoicePdf(originalPdfBuffer, record as any);
+    const stampedBytes = await stampInvoicePdf(originalPdfBuffer, record as any);
+    // Normaliza a Buffer: pdf-lib puede devolver Uint8Array
+    const stampedBuffer: Buffer = Buffer.isBuffer(stampedBytes)
+      ? stampedBytes
+      : Buffer.from(stampedBytes);
     const filename = `verifactu-${record.serie}-${record.numero}.pdf`;
-    return { buffer: stamped, filename };
+    return { buffer: stampedBuffer, filename };
   }
 
   /**
@@ -72,5 +78,35 @@ export class InvoicesService {
     const pdfBytes = await pdf.save();
     const fileName = `verifactu-${record.serie}-${record.numero}.pdf`;
     return { pdfBytes, fileName };
+  }
+
+  /**
+   * Ruta absoluta a la copia servidor del PDF sellado por id.
+   * Formato: STORAGE_DIR/&lt;id&gt;-VERIFACTU.pdf
+   */
+  private getServerStampedPath(id: string): string {
+    const baseDir = process.env.STORAGE_DIR || './data/invoices';
+    return path.resolve(baseDir, `${id}-VERIFACTU.pdf`);
+  }
+
+  /** Guarda (en servidor) el buffer sellado bajo STORAGE_DIR/&lt;id&gt;-VERIFACTU.pdf */
+  async storeStampedById(id: string, stamped: Uint8Array | Buffer): Promise<string> {
+    const absPath = this.getServerStampedPath(id);
+    const toWrite: Buffer = Buffer.isBuffer(stamped) ? stamped : Buffer.from(stamped);
+    await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
+    await fs.promises.writeFile(absPath, toWrite);
+    return absPath;
+  }
+
+  /** Lee (en servidor) el PDF sellado si existe, o null si no */
+  async readServerStampedById(id: string): Promise<Buffer | null> {
+    const absPath = this.getServerStampedPath(id);
+    try {
+      const stat = await fs.promises.stat(absPath);
+      if (!stat.isFile()) return null;
+      return await fs.promises.readFile(absPath);
+    } catch {
+      return null;
+    }
   }
 }

@@ -95,6 +95,7 @@
                                                 <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Fecha</th>
                                                 <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Importe</th>
                                                 <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Estado AEAT</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Descarga Veri*Factu</th>
                                             </tr>
                                         </thead>
                                         <tbody id="invoiceList" class="divide-y divide-gray-200 bg-white">
@@ -183,6 +184,15 @@
                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">${new Date(invoice.fechaEmision).toLocaleDateString('es-ES')}</td>
                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">€${parseFloat(invoice.importeTotal).toFixed(2)}</td>
                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">${statusBadge}</td>
+                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                  <button
+                                    class="btn-download-verifactu inline-flex items-center rounded border px-3 py-1 text-xs font-medium hover:bg-gray-50"
+                                    data-invoice-id="${invoice.id}"
+                                    title="Descargar PDF sellado"
+                                  >
+                                    Descargar PDF
+                                  </button>
+                                </td>
                             </tr>
                         `;
                         invoiceListEl.innerHTML += row;
@@ -202,6 +212,40 @@
                         return `<span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">${status}</span>`;
                 }
             };
+
+            // Descarga del PDF sellado (si no existe aún, muestra 'En preparación')
+            document.addEventListener('click', async (ev) => {
+                const target = ev.target;
+                if (!(target instanceof HTMLElement)) return;
+                if (!target.classList.contains('btn-download-verifactu')) return;
+                const id = target.getAttribute('data-invoice-id');
+                if (!id) return;
+                try {
+                    const resp = await fetch(`${bffBaseUrl}/invoices/${id}/pdf/stamped`, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    if (resp.status === 202) {
+                        alert('La factura sellada está en preparación. Inténtalo más tarde.');
+                        return;
+                    }
+                    if (!resp.ok) {
+                        alert('No se pudo descargar el PDF.');
+                        return;
+                    }
+                    const blob = await resp.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${id}-VERIFACTU.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                } catch (err) {
+                    console.error(err);
+                    alert('Error al descargar el PDF.');
+                }
+            });
 
             fetchDashboardData();
         });

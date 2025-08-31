@@ -56,6 +56,49 @@ async logEvent(tenantId: number, createEventDto: CreateEventDto) {
   return { status: 'evento registrado con éxito' };
 }
 
+  // --- Confirmación AEAT de una factura (append-only vía event_log) ---
+  async confirmInvoice(tenantId: number, invoiceId: string, body: any) {
+    // invoiceId suele ser numérico; aceptamos string y coercionamos
+    const invoiceNumericId = Number(invoiceId);
+    if (!Number.isFinite(invoiceNumericId)) {
+      throw new BadRequestException('invoiceId inválido');
+    }
+
+    // Verificamos que la factura exista y pertenezca al tenant
+    const invoice = await this.invoiceRecordRepository.findOne({
+      where: { id: invoiceNumericId as any, tenant: { id: tenantId } },
+      relations: ['tenant'],
+    });
+    if (!invoice) {
+      throw new NotFoundException(`Factura ${invoiceId} no encontrada para este tenant`);
+    }
+
+    // Construimos los detalles del evento de confirmación AEAT
+    const details = {
+      invoiceId: invoiceNumericId,
+      emisorNif: invoice.emisorNif,
+      serie: invoice.serie,
+      numero: invoice.numero,
+      hashActual: invoice.hashActual,
+      aeatResponse: body ?? {},
+    };
+    // Fallback robusto para tenantId: usa el del request o el de la propia factura
+    const tenantIdToUse =
+      (typeof tenantId === 'number' && Number.isFinite(tenantId))
+        ? tenantId
+        : ((invoice as any)?.tenant?.id ?? (invoice as any)?.tenantId);
+
+    const event = this.eventLogRepository.create({
+      tenantId: tenantIdToUse,
+      eventType: 'AEAT_CONFIRMED' as any,
+      details,
+    });
+    await this.eventLogRepository.save(event);
+
+    this.logger.log(`AEAT_CONFIRMED registrado para invoice ${invoiceNumericId}`);
+    return { status: 'OK', invoiceId: invoiceNumericId };
+  }
+
 
    // --- LÓGICA DE NEGOCIO PARA EL ONBOARDING UNIFICADO Y SEGURO ---
    async unifiedOnboarding(unifiedRegisterDto: UnifiedRegisterDto) {
@@ -265,7 +308,33 @@ async logEvent(tenantId: number, createEventDto: CreateEventDto) {
             order: { createdAt: 'DESC' },
             take: 10,
         });
-        return { tenant, invoiceCount, invoices };
+
+        // Leemos eventos AEAT_CONFIRMED y los indexamos por invoiceId
+    const aeatEvents = await this.eventLogRepository.find({
+      where: { tenantId, eventType: 'AEAT_CONFIRMED' as any },
+      order: { createdAt: 'DESC' },
+    });
+    const confirmedById = new Set<number>();
+    for (const e of aeatEvents) {
+      try {
+        const d = typeof (e as any).details === 'string'
+          ? JSON.parse((e as any).details)
+          : (e as any).details;
+        if (d && Number.isFinite(d.invoiceId)) {
+          confirmedById.add(Number(d.invoiceId));
+        }
+      } catch {
+        // detalles malformados: ignorar
+      }
+    }
+
+        // Proyectamos el estado mostrado: si hay AEAT_CONFIRMED → COMPLETED
+        const projected = invoices.map((inv: any) => {
+            const forced = confirmedById.has(Number(inv.id)) ? 'COMPLETED' : inv.estadoAeat;
+            return { ...inv, estadoAeat: forced };
+        });
+
+        return { tenant, invoiceCount, invoices: projected };
     }
 
     // --- Lógica de gestión de Jobs ---
@@ -288,10 +357,59 @@ async logEvent(tenantId: number, createEventDto: CreateEventDto) {
 
     async updateJob(id: string, updateJobDto: UpdateJobDto): Promise<Job> {
         const job = await this.findJobById(id);
+
+        // 1) Fusionar result (n8n no debe borrar nuestro invoiceRecordId)
+        const prevResult = (job.result ?? {}) as Record<string, any>;
+        const nextResult = (updateJobDto.result ?? {}) as Record<string, any>;
+
         job.status = updateJobDto.status as JobStatus;
-        if (updateJobDto.result) job.result = updateJobDto.result;
+        if (updateJobDto.result) {
+            job.result = { ...prevResult, ...nextResult };
+        }
         if (updateJobDto.errorMessage) job.errorMessage = updateJobDto.errorMessage;
-        return this.jobRepository.save(job);
+
+        const saved = await this.jobRepository.save(job);
+
+        // 2) Si quedó COMPLETED, registrar AEAT_CONFIRMED (append-only vía event_log)
+        try {
+            if (saved.status === JobStatus.COMPLETED) {
+                const merged = (saved.result ?? {}) as Record<string, any>;
+                const invoiceId = merged.invoiceRecordId as number | undefined;
+                if (invoiceId && Number.isFinite(invoiceId)) {
+                    // Buscar la factura para conocer tenantId y metadatos
+                    const inv = await this.invoiceRecordRepository.findOne({
+                        where: { id: invoiceId as any },
+                        relations: ['tenant'],
+                    });
+                    if (inv?.tenant?.id) {
+                        await this.eventLogRepository.save(
+                            this.eventLogRepository.create({
+                                tenantId: inv.tenant.id,
+                                eventType: 'AEAT_CONFIRMED' as any,
+                                details: {
+                                    invoiceId,
+                                    emisorNif: inv.emisorNif,
+                                    serie: inv.serie,
+                                    numero: inv.numero,
+                                    hashActual: inv.hashActual,
+                                    aeatResponse: merged.connectorResponse ?? nextResult ?? null,
+                                },
+                            }),
+                        );
+                        this.logger.log(
+                            `AEAT_CONFIRMED registrado para invoice ${invoiceId} (job ${saved.id})`,
+                        );
+                    }
+                }
+            }
+        } catch (e) {
+            // No romper el PATCH de n8n por errores de logging
+            this.logger.warn(
+                `No se pudo registrar AEAT_CONFIRMED para job ${saved.id}: ${e?.message}`,
+            );
+        }
+
+        return saved;
     }
 
     async findTenantByNif(nif: string): Promise<Tenant | null> {

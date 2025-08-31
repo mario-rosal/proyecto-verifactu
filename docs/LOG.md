@@ -16,7 +16,7 @@
 # LOG del proyecto — VeriFactu
 
 > Bitácora única y fuente de verdad para IA y equipo. Mantener breve, factual y actualizada.  
-> **Última actualización:** 2025-08-26
+> **Última actualización:** 2025-08-31
 
 ---
 
@@ -24,11 +24,11 @@
 
 - **Inmutabilidad:** `event_log` e `invoice_record` son _append-only_ (triggers en BD).
 - **Trazabilidad:** hash SHA-256 encadenado en `invoice_record` (`hash_anterior` → `hash_actual`).
-- **Verificabilidad:** PDF con **QR** + leyenda **“VERI\*FACTU”** (endpoint `GET /invoices/:id/pdf` implementado en BFF).
+- **Verificabilidad:** PDF con **QR** + leyenda **“VERI*FACTU”** (endpoint `GET /invoices/:id/pdf` implementado en BFF).
 
 ## TL;DR (para IA)
 
-- Producto: **Compliance as a Service** (Veri\*Factu). **No** somos un ERP.
+- Producto: **Compliance as a Service** (Veri*Factu). **No** somos un ERP.
 - Stack: NestJS (TS) + PostgreSQL + TypeORM · n8n + Gemini · UI Vanilla+Tailwind · Electron (printer).
 - Monorepo: https://github.com/mario-rosal/proyecto-verifactu
 - CI: **ligero** (lint/type/build no bloquean; e2e desactivados por ahora).
@@ -53,6 +53,15 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 
 ## Entradas (más reciente primero)
 
+### 2025-08-31 — Cierre Sprint “flujo completo de factura con PDF oficial”
+
+- ✅ Flujo extremo a extremo validado: desde Webhook (n8n) → OCR/IA → Job `INVOICE_SUBMISSION` → BFF (`finalizeAndSealInvoice`) → Conector AEAT (mock) → dashboard.
+- ✅ Generación del **PDF oficial con sello + leyenda Veri*factu + QR**, almacenado en servidor (`STORAGE_DIR`) y disponible para descarga en dashboard.
+- ✅ Binario PDF preservado entre subflujos n8n: empaquetado en `_pdf.b64` y reinyectado antes de estampar.
+- ✅ Estado en dashboard: *Aceptada* mediante `event_log (AEAT_CONFIRMED)`.
+- ⚠️ `invoice_record.estado_aeat` sigue siendo `PENDING` en BD (append-only); se confirma estrategia de “caja negra auditable”: BD nunca sobrescribe, sólo añade, y el estado visible se proyecta desde eventos.
+- ✅ Validación de hash encadenado, trazabilidad garantizada.
+
 ## 2025-08-26 — Fase D: PDF con QR + “VERI*FACTU” (BFF)
 
 - **Endpoint BFF**: `GET /invoices/:id/pdf` (sin prefijo de versión).
@@ -74,14 +83,13 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 - **Estado:** completado. El conector **lee/guarda** `config.json` (API key real + carpeta), arranca watcher y muestra logs:  
   `[Chokidar] Vigilando la carpeta: <path>`, `Nuevo archivo detectado: <file>`, `[Envío] Enviando <file> a n8n...`, `[Envío] Archivo <file> enviado con éxito.`
 - **n8n (ajustes mínimos):**
-  - Tras el **Webhook**, `Edit Fields (manual)` crea `ctx.apiKey` (String) desde `headers['x-api-key']` **normalizada** (sin CR/LF, `trim()`).
+  - Tras el **Webhook**, `Edit Fields (manual)` crea `ctx.apiKey` (String) desde `headers["x-api-key"]` **normalizada** (sin CR/LF, `trim()`).
   - Todos los **HTTP Request** al BFF envían header `x-api-key = {{$json.ctx.apiKey}}`.
   - IF de validación usa **`$node["Validar API Key en BFF"].json.error is empty`** (no `item.error`).
   - En el **Execute Workflow** hacia el subflujo se **incluyen** `jobId` y `ctx.apiKey` para que el subflujo use `{{$json.ctx.apiKey}}` en sus headers.
 - **Incidencias resueltas:**
   - **403 Forbidden** por no enviar `x-api-key` en header → se envía desde n8n.
-  - **TypeError [ERR_INVALID_CHAR]** por `
-` en la key → se limpia al construir `ctx.apiKey`.
+  - **TypeError [ERR_INVALID_CHAR]** por `\n` en la key → se limpia al construir `ctx.apiKey`.
   - **ECONNREFUSED host.docker.internal:3001** → servicio BFF no estaba levantado; al iniciar, queda operativo. (Recomendación: en Docker usar `http://verifactu-bff:3001`).
 - **Observación:** Puede aparecer error de envío si el PDF está aún “en escritura” (Windows). **Pendiente** decidir si aplicar `awaitWriteFinish + reintentos` en el watcher (no aplicado en repo).
 - **Siguiente fase (C):** Procesamiento de la primera factura → foco en **finalizar y sellar** (módulo `verifactu-connector` + simulador AEAT).
@@ -106,7 +114,7 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
   - **BFF**: lint + typecheck + **e2e** bloquean (portero activo).
 - Seguridad CI: `main` protegida con “Require status checks to pass”.
 - BFF:
-  - `health` module + `GET /healthz` (sonda DB con `DataSource.query('SELECT 1')`).
+  - `health` module + `GET /healthz` (sonda DB con `DataSource.query(\'SELECT 1\')`).
   - Test e2e (`jest` + `@nestjs/testing` + `supertest`) en `test/health.e2e-spec.ts`.
   - `AuthModule` exporta `AuthService` y registra `ApiKeyGuard` global (permite `/healthz` sin API key).
   - **EventLog** entidad creada (campos arriba) y persistencia ajustada.
@@ -117,7 +125,7 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 
 ### Sprint 0 — Concepción y estrategia
 
-- Producto: **pasarela de cumplimiento** (CaaS, Veri\*Factu), no facturador.
+- Producto: **pasarela de cumplimiento** (CaaS, Veri*Factu), no facturador.
 - Nicho objetivo: **PYMES** con TPV/ERP legacy sin actualización.
 - Arquitectura inicial: BFF + Connector AEAT + PostgreSQL + UI; **n8n** como orquestador.
 
@@ -177,3 +185,11 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 - Salida: PDF original con **overlay** de leyenda “VERI*FACTU — Factura verificable en la sede electrónica de la AEAT” + QR en esquina superior derecha.
 - QR codifica URL con campos de `invoice_record` (`emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`).
 - QA: probado con `curl`, verificado PDF resultante correcto.
+
+## 2025-08-27 — Sprint F: disponibilidad del PDF sellado en Dashboard
+
+- BFF: implementado endpoint `GET /invoices/:id/pdf/stamped` protegido con ApiKeyGuard.
+- Almacenamiento en bucket S3-compatible (MinIO local, Amazon S3 en producción).
+- Flujo n8n actualizado: cuando una factura pasa a estado “sellada”, llama al BFF para estampar y subir el PDF a `stamped/<invoice_id>.pdf`.
+- Dashboard: añadido botón “Descargar Factura Veri*Factu (PDF)” que consulta el nuevo endpoint.
+- QA: verificado que el PDF se descarga con overlay de leyenda y QR, cumpliendo contrato de datos.
