@@ -16,10 +16,12 @@ import { ApiKey } from './entities/api-key.entity';
 import { EventLog } from './event-log/event-log.entity';
 import { HealthModule } from './health/health.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
 
 @Module({
   imports: [
     InvoicesModule,
+    ApiKeysModule,
     HealthModule,
     AuthModule, // <-- El AuthModule está correctamente importado
     HttpModule,
