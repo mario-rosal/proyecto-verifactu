@@ -111,9 +111,56 @@
                     </div>
 
                 </div>
+
+                <!-- Sección API Keys -->
+                <div class="mt-12">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold text-gray-900">API Keys</h2>
+                        <button id="btnCreateApiKey" class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none">
+                            Crear API Key
+                        </button>
+                    </div>
+
+                    <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                        <table class="min-w-full divide-y divide-gray-300">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Prefijo</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Creada</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Último uso</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Estado</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="apiKeysTbody" class="divide-y divide-gray-200 bg-white">
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-gray-500">Cargando API Keys...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
+
+    <!-- Modal: mostrar API Key una sola vez -->
+    <div id="apiKeyModal" class="fixed inset-0 hidden items-center justify-center z-50">
+        <div class="fixed inset-0 bg-black/50" id="apiKeyModalBackdrop"></div>
+        <div class="relative bg-white rounded-lg shadow-lg max-w-lg w-full mx-4 p-6 z-10">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Nueva API Key</h3>
+            <p class="text-sm text-gray-600 mb-4">Cópiala ahora; <span class="font-semibold">no se volverá a mostrar</span>.</p>
+            <div class="bg-gray-100 rounded p-3 font-mono text-sm break-all" id="apiKeyValue">•••</div>
+            <div class="mt-4 flex justify-end gap-2">
+                <button id="btnCopyApiKey" class="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50">Copiar</button>
+                <button id="btnCloseApiKeyModal" class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Entendido</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 space-y-2 z-50 pointer-events-none"></div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const bffBaseUrl = 'http://localhost:3001';
@@ -124,6 +171,14 @@
             const invoiceListEl = document.getElementById('invoiceList');
             const logoutButton = document.getElementById('logoutButton');
 
+            // API Keys UI
+            const apiKeysTbody = document.getElementById('apiKeysTbody');
+            const btnCreateApiKey = document.getElementById('btnCreateApiKey');
+            const apiKeyModal = document.getElementById('apiKeyModal');
+            const apiKeyModalBackdrop = document.getElementById('apiKeyModalBackdrop');
+            const apiKeyValueEl = document.getElementById('apiKeyValue');
+            const btnCopyApiKey = document.getElementById('btnCopyApiKey');
+            const btnCloseApiKeyModal = document.getElementById('btnCloseApiKeyModal');
             // --- 1. VERIFICACIÓN DE SEGURIDAD ---
             const accessToken = localStorage.getItem('accessToken');
             if (!accessToken) { // <-- Si falta el token, fuera
@@ -140,12 +195,13 @@
                 window.location.href = './login.html';
             });
 
+            // ------------------ DASHBOARD DATA ------------------
             // --- 3. OBTENCIÓN DE DATOS SEGUROS ---
             const fetchDashboardData = async () => {
                 try {
                     const response = await fetch(`${bffBaseUrl}/v1/dashboard`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
                     
                     if (response.status === 401) {
                         // Si el token es inválido o ha expirado, redirigimos al login
@@ -165,6 +221,7 @@
                 }
             };
 
+            // ------------------ INVOICES RENDER ------------------
             // --- 4. RENDERIZADO DE LA INTERFAZ ---
             const updateDashboardUI = (data) => {
                 welcomeMessageEl.textContent = `Bienvenido, ${data.tenant.razonSocial}`;
@@ -247,7 +304,211 @@
                 }
             });
 
+            // ------------------ API KEYS: helpers ------------------
+            const fmtDate = (iso) => {
+                if (!iso) return '—';
+                const d = new Date(iso);
+                if (Number.isNaN(d.getTime())) return '—';
+                return d.toLocaleString('es-ES');
+            };
+
+            const statusPill = (active) => {
+                return active
+                    ? `<span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Activa</span>`
+                    : `<span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">Revocada</span>`;
+            };
+
+            const showToast = (msg, kind = 'info') => {
+                const container = document.getElementById('toastContainer');
+                if (!container) return alert(msg);
+                const base = document.createElement('div');
+                base.className = `pointer-events-auto rounded-md shadow px-4 py-2 text-sm text-white ${kind === 'error' ? 'bg-red-600' : kind === 'success' ? 'bg-green-600' : 'bg-gray-800'}`;
+                base.textContent = msg;
+                container.appendChild(base);
+                setTimeout(() => base.remove(), 3500);
+            };
+
+            const openApiKeyModal = (apiKey) => {
+                apiKeyValueEl.textContent = apiKey || '—';
+                apiKeyModal.classList.remove('hidden');
+                apiKeyModal.classList.add('flex');
+            };
+            const closeApiKeyModal = () => {
+                apiKeyModal.classList.add('hidden');
+                apiKeyModal.classList.remove('flex');
+                apiKeyValueEl.textContent = '•••';
+            };
+
+            // ------------------ API KEYS: network ------------------
+            const fetchApiKeys = async () => {
+                try {
+                    const resp = await fetch(`${bffBaseUrl}/api-keys`, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    if (resp.status === 401) {
+                        localStorage.removeItem('accessToken');
+                        window.location.href = './login.html';
+                        return;
+                    }
+                    if (!resp.ok) throw new Error(`Error ${resp.status}`);
+                    const list = await resp.json(); // [{ id, keyPrefix, isActive, createdAt, lastUsedAt }]
+                    renderApiKeys(list);
+                } catch (e) {
+                    console.error('Error al cargar API Keys:', e);
+                    apiKeysTbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500">No se pudieron cargar las API Keys.</td></tr>`;
+                    showToast('No se pudieron cargar las API Keys', 'error');
+                }
+            };
+
+            const createApiKey = async () => {
+                try {
+                    const resp = await fetch(`${bffBaseUrl}/api-keys`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    if (resp.status === 401) {
+                        localStorage.removeItem('accessToken');
+                        window.location.href = './login.html';
+                        return;
+                    }
+                    if (!resp.ok) throw new Error(`Error ${resp.status}`);
+                    const data = await resp.json(); // { apiKey, id, keyPrefix }
+                    // Mostrar la API Key SOLO UNA VEZ
+                    openApiKeyModal(data.apiKey);
+                    showToast('API Key creada', 'success');
+                    // refrescar listado
+                    await fetchApiKeys();
+                } catch (e) {
+                    console.error('Error al crear API Key:', e);
+                    showToast('No se pudo crear la API Key', 'error');
+                }
+            };
+
+            const revokeApiKey = async (id) => {
+                try {
+                    const resp = await fetch(`${bffBaseUrl}/api-keys/${encodeURIComponent(id)}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    if (resp.status === 401) {
+                        localStorage.removeItem('accessToken');
+                        window.location.href = './login.html';
+                        return;
+                    }
+                    if (!resp.ok) throw new Error(`Error ${resp.status}`);
+                    const data = await resp.json(); // { revoked: true }
+                    if (data && data.revoked) {
+                        showToast('API Key revocada', 'success');
+                        // refrescar listado sin recargar toda la página
+                        await fetchApiKeys();
+                    } else {
+                        showToast('No se pudo revocar la API Key', 'error');
+                    }
+                } catch (e) {
+                    console.error('Error al revocar API Key:', e);
+                    showToast('Error al revocar la API Key', 'error');
+                }
+            };
+
+            // ------------------ API KEYS: render ------------------
+            const renderApiKeys = (list) => {
+                if (!Array.isArray(list) || list.length === 0) {
+                    apiKeysTbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-500">No hay API Keys.</td></tr>`;
+                    return;
+                }
+                apiKeysTbody.innerHTML = '';
+                list.forEach(k => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">${k.keyPrefix || '—'}</td>
+                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">${fmtDate(k.createdAt)}</td>
+                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">${fmtDate(k.lastUsedAt)}</td>
+                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">${statusPill(k.isActive)}</td>
+                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                            ${k.isActive ? `
+                                <button class="btn-revoke-api-key inline-flex items-center rounded border px-3 py-1 text-xs font-medium hover:bg-gray-50" data-id="${k.id}">
+                                    Revocar
+                                </button>` : `
+                                <span class="text-gray-400 text-xs">Sin acciones</span>
+                            `}
+                        </td>
+                    `;
+                    apiKeysTbody.appendChild(tr);
+                });
+            };
+
+            // ------------------ API KEYS: events ------------------
+            if (btnCreateApiKey) {
+                btnCreateApiKey.addEventListener('click', async () => {
+                    await createApiKey();
+                });
+            }
+            if (btnCloseApiKeyModal) {
+                btnCloseApiKeyModal.addEventListener('click', closeApiKeyModal);
+            }
+            if (apiKeyModalBackdrop) {
+                apiKeyModalBackdrop.addEventListener('click', closeApiKeyModal);
+            }
+            if (btnCopyApiKey) {
+                btnCopyApiKey.addEventListener('click', async () => {
+                    const text = apiKeyValueEl.textContent || '';
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        showToast('Copiado al portapapeles', 'success');
+                    } catch {
+                        showToast('No se pudo copiar', 'error');
+                    }
+                });
+            }
+
+            document.addEventListener('click', async (ev) => {
+                const el = ev.target;
+                if (!(el instanceof HTMLElement)) return;
+
+                // Botón de revocar API Key (delegación de eventos)
+                if (el.classList.contains('btn-revoke-api-key')) {
+                    const id = el.getAttribute('data-id');
+                    if (!id) return;
+                    if (!confirm('¿Seguro que deseas revocar esta API Key?')) return;
+                    await revokeApiKey(id);
+                    return; // Finaliza para no interferir con otros listeners
+                }
+
+                // Botón de descarga de PDF (delegación de eventos)
+                const downloadBtn = el.closest('.btn-download-verifactu');
+                if (downloadBtn) {
+                    const id = downloadBtn.getAttribute('data-invoice-id');
+                    if (!id) return;
+                    try {
+                        const resp = await fetch(`${bffBaseUrl}/invoices/${id}/pdf/stamped`, {
+                            headers: { 'Authorization': `Bearer ${accessToken}` }
+                        });
+                        if (resp.status === 202) {
+                            alert('La factura sellada está en preparación. Inténtalo más tarde.');
+                            return;
+                        }
+                        if (!resp.ok) {
+                            alert('No se pudo descargar el PDF.');
+                            return;
+                        }
+                        const blob = await resp.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${id}-VERIFACTU.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                    } catch (err) {
+                        console.error(err);
+                        alert('Error al descargar el PDF.');
+                    }
+                }
+            });
+
             fetchDashboardData();
+            fetchApiKeys();
         });
     </script>
 </body>

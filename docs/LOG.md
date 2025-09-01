@@ -1,7 +1,7 @@
 # LOG del proyecto — VeriFactu
 
 &gt; Bitácora única y fuente de verdad para IA y equipo. Mantener breve, factual y actualizada.  
-&gt; **Última actualización:** 2025-08-31
+&gt; **Última actualización:** 2025-09-01
 
 ---
 
@@ -35,6 +35,13 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 ---
 
 ## Entradas (más reciente primero)
+
+### 2025-09-01 — DASH-APIKEYS-UI (gestión en dashboard + cleanup BD)
+- Dashboard (`dashboard.html`): nueva sección **API Keys** (listado, crear, revocar) usando `/api-keys` con JWT.
+- Modal al crear: muestra la clave completa **solo una vez**; listado muestra solo prefijo y metadatos.
+- Acciones de revocación actualizan estado sin recargar toda la página; errores visibles al usuario.
+- Backend sin cambios de rutas (mantiene `/api-keys`), guardia JWT ya activa.
+- Limpieza de datos en BD: queda **solo tenant 1**, usuario `mrcompa@gmail.com` y la API Key general (`b4b13628…`).
 
 ### 2025-08-31 — BFF-APIKEYS (endpoints y logging)
 - BFF: módulo `api-keys/` con `GET/POST/DELETE /api-keys` (uso desde dashboard con JWT; guardia global JWT|x-api-key sigue activo).
