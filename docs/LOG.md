@@ -36,6 +36,14 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 
 ## Entradas (más reciente primero)
 
+## 2025-09-01 — BFF — Paquete del conector (MVP descargable)
+- Endpoint **POST /connector-package** (JWT-only): genera API Key dedicada y devuelve un **ZIP** con `config.json` `{apiKey, tenantId}` + binarios.
+- Incluye instalador Windows **`bin/VeriFactu-Connector-Setup-1.0.0.exe`** (si existe en `verifactu-printer-connector/bin`); si no, agrega `bin/README.txt`.
+- `event_log`: registra `CONFIG_UPDATE` con `{action:"API_KEY_CREATED"}` y `{action:"CONNECTOR_PACKAGE_GENERATED"}` (tenant_id=1).
+- BFF: dependencia **archiver** añadida; uso correcto `import * as archiver` + `archiver.create(...)`; resolución de rutas robusta hacia `verifactu-printer-connector/bin`.
+- Conector: añadido **electron-builder** (NSIS), `directories.output=bin`, `artifactName=VeriFactu-Connector-Setup-${version}.${ext}`; fijada versión **24.6.3** por estabilidad en Windows.
+- QA: ZIP ~75 MB con `.exe` + `config.json` correcto, verificado con `curl` y apertura local.
+
 ### 2025-09-01 — DASH-APIKEYS-UI (gestión en dashboard + cleanup BD)
 - Dashboard (`dashboard.html`): nueva sección **API Keys** (listado, crear, revocar) usando `/api-keys` con JWT.
 - Modal al crear: muestra la clave completa **solo una vez**; listado muestra solo prefijo y metadatos.

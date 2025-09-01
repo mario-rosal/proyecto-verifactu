@@ -19,6 +19,11 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Backend (verifactu-bff):
    Stack: NestJS (TypeScript), TypeORM, PostgreSQL.
    Rol: Es el "guardián del estado y la lógica de negocio". Gestiona la API REST, la base de datos, la autenticación de usuarios (con bcrypt y JWT), la lógica de "Trabajos" asíncronos y la generación de API Keys.
+   Endpoints relevantes:
+   - **POST /connector-package** *(JWT-only)*: genera una **API Key dedicada** para el tenant, construye y devuelve un **ZIP** con:
+     - `config.json` `{ apiKey, tenantId }`
+     - Binarios del conector **(instalador Windows Electron/NSIS si está disponible en `verifactu-printer-connector/bin`)**
+     Además, registra en `event_log` un `CONFIG_UPDATE` con `details.action = CONNECTOR_PACKAGE_GENERATED`.
    Conector AEAT (verifactu-connector):
    Stack: NestJS (TypeScript), soap.
    Rol: El "servicio de mensajería" especializado en la comunicación SOAP con la AEAT.
@@ -105,7 +110,7 @@ Este documento sirve como un registro técnico y estratégico completo del proye
 4. El "Hacia Dónde": Próximos Pasos
    Con el desarrollo funcional principal ya completado, el proyecto entra en su fase final de preparación para el lanzamiento.
    Generación del Documento Final: El siguiente gran paso es implementar la generación del PDF oficial de la factura, que incluya el código QR y la leyenda "VERI\*FACTU". Esto se hará en un nuevo flujo de n8n que tomará los datos de la factura ya sellada.
-   Empaquetado y Despliegue: Usaremos electron-builder para crear los instaladores profesionales del conector y construiremos la lógica de "Descarga Personalizada" en el dashboard. Paralelamente, desplegaremos nuestros servicios de backend y n8n en una infraestructura en la nube.
+   Empaquetado y Despliegue: **Ya usamos electron-builder (NSIS)** para generar el instalador del conector y la **descarga personalizada** desde el dashboard está implementada mediante `POST /connector-package` (ZIP con instalador + `config.json`). Paralelamente, desplegaremos nuestros servicios de backend y n8n en una infraestructura en la nube.
    Integración Real con la AEAT: El último paso será obtener un certificado de sello electrónico oficial y "cambiar el enchufe" del verifactu-connector, pasando de nuestro simulador al entorno de producción de la Agencia Tributaria.
 5. Flujo Completo: De Cero a Factura Legal
    Aquí se detalla el viaje completo del usuario, desde que descubre el servicio hasta que emite su primera factura 100% legal.
@@ -114,7 +119,9 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Orquestación del Alta (n8n): El formulario envía los datos a un workflow de n8n. Este flujo utiliza un agente de IA para limpiar y validar los datos. Si todo es correcto, llama a nuestro bff.
    Creación en Backend (bff): El bff ejecuta una transacción segura que crea el tenant (la empresa), el primer user (el administrador) y genera automáticamente la primera API Key única para ese cliente.
    Bienvenida y Login: El usuario es redirigido a la página de login.html y puede iniciar sesión con las credenciales que acaba de crear.
-   Descarga del Conector (Dashboard): Al iniciar sesión, el usuario accede a su dashboard.html. Aquí encontrará un botón de "Descargar Conector". Al hacer clic, nuestro bff le proporciona un instalador genérico junto con un archivo config.json que contiene su API Key única.
+   Descarga del Conector (Dashboard): Al iniciar sesión, el usuario accede a su dashboard.html. Aquí encuentra un botón **“Descargar Conector”**. Al hacer clic, nuestro **bff** invoca `POST /connector-package` y entrega un **ZIP** que contiene:
+   - **Instalador Windows** del conector (Electron/NSIS), cuando está disponible.
+   - **`config.json`** con una **API Key dedicada** y el **tenantId** generados justo en esa solicitud.
    Instalación "Cero Fricción" (Electron): El usuario instala el conector. En su primer arranque, la aplicación detecta el config.json, guarda la API Key de forma segura y le pide al usuario que seleccione la carpeta donde su TPV "imprime" las facturas en PDF. A partir de este momento, el conector se inicia automáticamente con el ordenador y trabaja en segundo plano.
    Fase B: Emisión de una Factura (El Día a Día)
    "Impresión" desde el Software Antiguo: El camarero del restaurante genera una factura en su TPV como siempre. Al finalizar, en lugar de imprimirla en papel, la "imprime" en la carpeta que el conector está vigilando.

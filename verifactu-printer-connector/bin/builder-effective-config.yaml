@@ -1,0 +1,23 @@
+directories:
+  output: bin
+  buildResources: build
+appId: com.verifactu.connector
+productName: VeriFactu Connector
+artifactName: VeriFactu-Connector-Setup-${version}.${ext}
+files:
+  - filter:
+      - '**/*'
+      - '!bin/**'
+      - '!config.json'
+      - '!**/*.map'
+asar: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+electronVersion: 31.7.7
