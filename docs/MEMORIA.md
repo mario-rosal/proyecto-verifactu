@@ -36,6 +36,9 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Frontend (UI):
    Stack: HTML, JavaScript ("Vanilla JS"), Tailwind CSS.
    Componentes: index.html (Onboarding), login.html, dashboard.html, y las páginas para la recuperación de contraseña.
+   Capacidades del Dashboard (estado actual):
+   - Listado de facturas y descarga del **PDF oficial Veri*Factu** (sello + QR).
+   - **Gestión de API Keys** (listar, crear —se muestra solo una vez—, revocar) protegida con JWT.
    Conector de Escritorio (verifactu-printer-connector):
    Stack: Electron, chokidar, electron-store, axios.
    Rol: El "mensajero". Una aplicación ligera que vigila una carpeta, lee la API Key de un config.json y envía los nuevos PDFs a n8n.
@@ -46,6 +49,8 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Sprint 4 (Seguridad y Acceso): Se implementó el sistema de autenticación de usuarios de principio a fin: la tabla users con roles, los endpoints de registro y login con JWT, el AuthGuard para proteger rutas y el flujo completo de recuperación de contraseña.
    Sprint 5 (El Conector Disruptivo): Se construyó y depuró la aplicación de escritorio "Impresora Virtual" con Electron. Se validó la arquitectura de comunicación segura (preload script) y se implementó la lógica para vigilar una carpeta y enviar los archivos a n8n con una API Key pre-configurada.
    Sprint 6 (Cumplimiento Avanzado): Se añadieron las capas finales de cumplimiento normativo, destacando la implementación del "Libro de Incidencias" (la tabla event_log y los endpoints correspondientes en el bff).
+
+   Sprint 7 (DASH-APIKEYS-UI): Se incorporó en el dashboard la **gestión de API Keys** para cada tenant (listar metadatos, crear con visualización única y revocar). El backend expone `GET/POST/DELETE /api-keys` protegido con JWT; el dashboard consume estos endpoints y muestra feedback de errores.
 
    Sprint E (Sellado Visual de Facturas): Se implementó en el BFF el endpoint `POST /invoices/:id/pdf/stamp`, protegido con ApiKeyGuard. Este servicio recibe un PDF original en `multipart/form-data` y devuelve el mismo documento con un overlay de la leyenda “VERI*FACTU — Factura verificable en la sede electrónica de la AEAT” en cabecera y pie, junto con un código QR en la esquina superior derecha. El QR codifica la URL de verificación con los campos de `invoice_record` (`emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`). Se verificó mediante pruebas con `curl` que el PDF resultante conserva el contenido original y cumple el contrato de datos definido.
 
