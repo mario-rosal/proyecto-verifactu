@@ -1,7 +1,7 @@
 # LOG del proyecto — VeriFactu
 
 &gt; Bitácora única y fuente de verdad para IA y equipo. Mantener breve, factual y actualizada.  
-&gt; **Última actualización:** 2025-09-01
+&gt; **Última actualización:** 2025-09-03
 
 ---
 
@@ -35,6 +35,15 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 ---
 
 ## Entradas (más reciente primero)
+
+## 2025-09-03 — BFF/Dashboard — Descarga “Guardar como…” + progreso (estabilizada)
+- **Endpoint**: `POST /v1/connector-package` (JWT). Respuesta `application/zip` con `Content-Disposition` (nombre de archivo) y **`Content-Length`** (descarga determinista).
+- **CORS**: `Access-Control-Allow-Headers: Authorization, Content-Type` y `Access-Control-Expose-Headers: Content-Disposition`; preflight `OPTIONS` verificado (204).
+- **Dashboard**: emplea **File System Access API** cuando está disponible → diálogo **“Guardar como…”** y escritura por *streaming* con progreso en el botón. *Fallback* universal a Blob + `&lt;a download&gt;`.
+- **Verificación**: descarga reproducible con `curl` (ZIP ~183–187 MB recibido completo).
+- **Sin cambios de contrato**: el botón sigue apuntando a `/v1/connector-package`; no se requieren ajustes de rutas.
+- **Pendiente (tamaño)**: instalador Electron voluminoso. Próximo trabajo propuesto: `nsis-web` (web installer) o recorte de artefactos incluidos. No afecta a la **estabilidad** de la descarga actual.
+
 
 ## 2025-09-01 — BFF — Paquete del conector (MVP descargable)
 - Endpoint **POST /connector-package** (JWT-only): genera API Key dedicada y devuelve un **ZIP** con `config.json` `{apiKey, tenantId}` + binarios.

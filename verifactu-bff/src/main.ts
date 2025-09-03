@@ -7,15 +7,19 @@ import { ValidationPipe } from '@nestjs/common';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // --- 👇 LA SOLUCIÓN DEFINITIVA Y ROBUSTA ESTÁ AQUÍ 👇 ---
-  // Habilitamos CORS con una configuración explícita. Esto le dice al
-  // navegador que acepte peticiones desde cualquier origen ('*'), con
-  // los métodos y cabeceras más comunes. Es la configuración más robusta
-  // para un entorno de desarrollo y soluciona el bloqueo de "Failed to fetch".
+  // API versionada para estabilizar contratos (prod-ready)
+  app.setGlobalPrefix('v1');
+
+  // CORS: refleja siempre el Origin del navegador (dev). Evita 'null' en descargas XHR/Blob.
+  // En prod cambiaremos a una whitelist por dominio sin alterar el resto.
   app.enableCors({
-    origin: '*', // Permite cualquier origen
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
+    origin: true,                      // refleja el Origin recibido
+    credentials: false,                // no usamos cookies
+    methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+    allowedHeaders: ['Authorization','Content-Type'],
+    exposedHeaders: ['Content-Disposition'],
+    optionsSuccessStatus: 204,
+    maxAge: 86400,
   });
 
   app.useGlobalPipes(new ValidationPipe());

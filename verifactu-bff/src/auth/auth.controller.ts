@@ -4,7 +4,7 @@ import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto, ForgotPasswordDto, ResetPasswordDto, ValidateApiKeyDto, RegisterDto } from '../dto/auth.dto';
 
-@Controller('v1/auth')
+@Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 

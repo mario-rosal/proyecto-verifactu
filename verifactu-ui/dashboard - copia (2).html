@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="es" class="h-full bg-gray-100">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,12 +9,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
+        body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-
 <body class="h-full">
     <div class="min-h-full">
         <!-- Barra de Navegación -->
@@ -24,32 +20,25 @@
                 <div class="flex h-16 items-center justify-between">
                     <div class="flex items-center">
                         <div class="flex-shrink-0 text-white font-bold text-lg flex items-center">
-                            <svg class="h-8 w-8 mr-2 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            <svg class="h-8 w-8 mr-2 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                             </svg>
                             VeriFactu
                         </div>
                         <div class="hidden md:block">
                             <div class="ml-10 flex items-baseline space-x-4">
-                                <a href="#" class="bg-gray-900 text-white rounded-md px-3 py-2 text-sm font-medium"
-                                    aria-current="page">Dashboard</a>
-                                <a href="#"
-                                    class="text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-3 py-2 text-sm font-medium">Facturas</a>
-                                <a href="#"
-                                    class="text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-3 py-2 text-sm font-medium">Configuración</a>
+                                <a href="#" class="bg-gray-900 text-white rounded-md px-3 py-2 text-sm font-medium" aria-current="page">Dashboard</a>
+                                <a href="#" class="text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-3 py-2 text-sm font-medium">Facturas</a>
+                                <a href="#" class="text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-3 py-2 text-sm font-medium">Configuración</a>
                             </div>
                         </div>
                     </div>
                     <div class="hidden md:block">
                         <div class="ml-4 flex items-center md:ml-6 gap-2">
-                            <button id="btnDownloadConnector" type="button"
-                                class="bg-blue-600 text-white rounded-md px-3 py-2 text-sm font-medium hover:bg-blue-700">
+                            <button id="btnDownloadConnector" type="button" class="bg-blue-600 text-white rounded-md px-3 py-2 text-sm font-medium hover:bg-blue-700">
                                 Descargar Conector
                             </button>
-                            <button id="logoutButton" type="button"
-                                class="text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-3 py-2 text-sm font-medium">
+                            <button id="logoutButton" type="button" class="text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-3 py-2 text-sm font-medium">
                                 Cerrar Sesión
                             </button>
                         </div>
@@ -61,8 +50,7 @@
         <!-- Cabecera del Dashboard -->
         <header class="bg-white shadow">
             <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                <h1 id="welcomeMessage" class="text-3xl font-bold tracking-tight text-gray-900">Cargando Dashboard...
-                </h1>
+                <h1 id="welcomeMessage" class="text-3xl font-bold tracking-tight text-gray-900">Cargando Dashboard...</h1>
             </div>
         </header>
 
@@ -70,7 +58,7 @@
         <main>
             <div class="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
                 <div class="px-4 py-6 sm:px-0">
-
+                    
                     <!-- Tarjetas de Resumen -->
                     <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
                         <div class="bg-white overflow-hidden shadow rounded-lg">
@@ -107,31 +95,18 @@
                                     <table class="min-w-full divide-y divide-gray-300">
                                         <thead class="bg-gray-50">
                                             <tr>
-                                                <th scope="col"
-                                                    class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
-                                                    Nº Factura</th>
-                                                <th scope="col"
-                                                    class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                                    Cliente</th>
-                                                <th scope="col"
-                                                    class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                                    Fecha</th>
-                                                <th scope="col"
-                                                    class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                                    Importe</th>
-                                                <th scope="col"
-                                                    class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                                    Estado AEAT</th>
-                                                <th scope="col"
-                                                    class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                                    Descarga Veri*Factu</th>
+                                                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Nº Factura</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Cliente</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Fecha</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Importe</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Estado AEAT</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Descarga Veri*Factu</th>
                                             </tr>
                                         </thead>
                                         <tbody id="invoiceList" class="divide-y divide-gray-200 bg-white">
                                             <!-- Las filas de facturas se insertarán aquí con JavaScript -->
                                             <tr>
-                                                <td colspan="5" class="text-center py-4 text-gray-500">Cargando
-                                                    facturas...</td>
+                                                <td colspan="5" class="text-center py-4 text-gray-500">Cargando facturas...</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -146,8 +121,7 @@
                 <div class="mt-12">
                     <div class="flex items-center justify-between mb-4">
                         <h2 class="text-xl font-semibold text-gray-900">API Keys</h2>
-                        <button id="btnCreateApiKey"
-                            class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none">
+                        <button id="btnCreateApiKey" class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none">
                             Crear API Key
                         </button>
                     </div>
@@ -156,17 +130,11 @@
                         <table class="min-w-full divide-y divide-gray-300">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th scope="col"
-                                        class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
-                                        Prefijo</th>
-                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                        Creada</th>
-                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                        Último uso</th>
-                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                        Estado</th>
-                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                        Acciones</th>
+                                    <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Prefijo</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Creada</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Último uso</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Estado</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="apiKeysTbody" class="divide-y divide-gray-200 bg-white">
@@ -186,14 +154,11 @@
         <div class="fixed inset-0 bg-black/50" id="apiKeyModalBackdrop"></div>
         <div class="relative bg-white rounded-lg shadow-lg max-w-lg w-full mx-4 p-6 z-10">
             <h3 class="text-lg font-semibold text-gray-900 mb-2">Nueva API Key</h3>
-            <p class="text-sm text-gray-600 mb-4">Cópiala ahora; <span class="font-semibold">no se volverá a
-                    mostrar</span>.</p>
+            <p class="text-sm text-gray-600 mb-4">Cópiala ahora; <span class="font-semibold">no se volverá a mostrar</span>.</p>
             <div class="bg-gray-100 rounded p-3 font-mono text-sm break-all" id="apiKeyValue">•••</div>
             <div class="mt-4 flex justify-end gap-2">
-                <button id="btnCopyApiKey"
-                    class="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50">Copiar</button>
-                <button id="btnCloseApiKeyModal"
-                    class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Entendido</button>
+                <button id="btnCopyApiKey" class="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50">Copiar</button>
+                <button id="btnCloseApiKeyModal" class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Entendido</button>
             </div>
         </div>
     </div>
@@ -204,7 +169,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const bffBaseUrl = 'http://localhost:3001';
-
+            
             const welcomeMessageEl = document.getElementById('welcomeMessage');
             const invoicesCountEl = document.getElementById('invoicesCount');
             const modalidadInfoEl = document.getElementById('modalidadInfo');
@@ -225,13 +190,13 @@
                 // Limpiamos por si acaso
                 localStorage.removeItem('accessToken');
                 window.location.href = './login.html';
-                return;
+                return; 
             }
 
             // --- 2. LÓGICA DE CERRAR SESIÓN ---
             logoutButton.addEventListener('click', () => {
                 localStorage.removeItem('accessToken');
-
+                
                 window.location.href = './login.html';
             });
 
@@ -242,7 +207,7 @@
                     const response = await fetch(`${bffBaseUrl}/v1/dashboard`, {
                         headers: { 'Authorization': `Bearer ${accessToken}` }
                     });
-
+                    
                     if (response.status === 401) {
                         // Si el token es inválido o ha expirado, redirigimos al login
                         localStorage.removeItem('accessToken');
@@ -501,111 +466,41 @@
                 });
             }
 
-            // ------------------ DESCARGA DEL CONECTOR ("Guardar como..." + progreso) ------------------
+            // ------------------ DESCARGA DEL CONECTOR (XHR binario) ------------------
             const btnDownloadConnector = document.getElementById('btnDownloadConnector');
-
-            const filenameFromCD = (cd) => {
-                if (!cd) return null;
-                // Intentar filename*=UTF-8''... primero
-                let m = cd.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
-                if (m && m[1]) return decodeURIComponent(m[1].replace(/"/g, ''));
-                // Fallback a filename="..."
-                m = cd.match(/filename\s*=\s*"([^"]+)"/i);
-                if (m && m[1]) return m[1];
-                // Fallback a filename=simple
-                m = cd.match(/filename\s*=\s*([^;]+)/i);
-                if (m && m[1]) return m[1].trim();
-                return null;
-            };
-
-            async function downloadConnectorZipSaveAs() {
-                // 0) Nombre sugerido por defecto (por si el picker se abre antes del fetch)
-                let suggested = 'verifactu-connector.zip';
-
-                // A. Si existe File System Access API, abrir el picker **ANTES** de hacer await alguno
-                //    (para no perder la "user activation" del click).
-                let handle = null;
-                if ('showSaveFilePicker' in window) {
-                    try {
-                        handle = await window.showSaveFilePicker({
-                            suggestedName: suggested,
-                            types: [{ description: 'ZIP', accept: { 'application/zip': ['.zip'] } }]
-                        });
-                    } catch (err) {
-                        if (err && err.name === 'AbortError') {
-                            showToast('Descarga cancelada', 'info');
-                            return;
-                        }
-                        // Si falla por políticas, seguimos con el flujo fallback más abajo
-                        handle = null;
+            const downloadConnectorZip = () => new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', `${bffBaseUrl}/v1/connector-package`, true);
+                xhr.responseType = 'blob';
+                xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+                xhr.onload = () => {
+                    if (xhr.status === 401) {
+                        localStorage.removeItem('accessToken');
+                        window.location.href = './login.html';
+                        return;
                     }
-                }
-
-                // B) Hacer la petición con Authorization (soporta CORS)
-                const resp = await fetch(`${bffBaseUrl}/v1/connector-package?variant=config`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
-                });
-                if (resp.status === 401) {
-                    localStorage.removeItem('accessToken');
-                    window.location.href = './login.html';
-                    return;
-                }
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
-                // C) Resolver nombre propuesto desde Content-Disposition
-                const cd = resp.headers.get('Content-Disposition') || '';
-                suggested = filenameFromCD(cd) || suggested;
-
-                // D) Si tenemos handle, escribir el stream directamente al archivo elegido
-                if (handle && resp.body) {
-                    const writable = await handle.createWritable();
-                    const reader = resp.body.getReader();
-
-                    const totalStr = resp.headers.get('Content-Length');
-                    const total = totalStr ? Number(totalStr) : 0;
-                    let received = 0;
-                    btnDownloadConnector.textContent = 'Descargando... 0 MB';
-
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        await writable.write(value);
-                        received += value.byteLength || value.length || 0;
-                        const mb = (received / (1024 * 1024)).toFixed(1);
-                        if (total > 0) {
-                            const pct = Math.floor((received / total) * 100);
-                            btnDownloadConnector.textContent = `Descargando... ${pct}% (${mb} MB)`;
-                        } else {
-                            btnDownloadConnector.textContent = `Descargando... ${mb} MB`;
-                        }
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        const blob = xhr.response;
+                        const url = URL.createObjectURL(blob);
+                                                // usar el nombre enviado por el servidor si existe
+                        const cd = xhr.getResponseHeader('Content-Disposition') || '';
+                        const m = cd.match(/filename="?([^"]+)"?/i);
+                        a.download = (m && m[1]) ? m[1] : 'verifactu-connector.zip';
+                        resolve(null);
+                    } else {
+                        reject(new Error(`HTTP ${xhr.status}`));
                     }
-                    await writable.close();
-                    showToast('Conector guardado correctamente', 'success');
-                    return;
-                }
-
-                // E) Fallback universal: Blob + descarga automática
-                const blob = await resp.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = suggested;
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(() => {
-                    URL.revokeObjectURL(url);
-                    a.remove();
-                }, 1500);
-                showToast('Descarga iniciada', 'success');
-            }
-
+                };
+                xhr.onerror = () => reject(new Error('Network error'));
+                xhr.send();
+            });
             if (btnDownloadConnector) {
                 btnDownloadConnector.addEventListener('click', async () => {
                     try {
                         btnDownloadConnector.disabled = true;
-                        btnDownloadConnector.textContent = 'Preparando...';
-                        await downloadConnectorZipSaveAs();
+                        btnDownloadConnector.textContent = 'Descargando...';
+                        await downloadConnectorZip();
+                        showToast('Conector descargado correctamente', 'success');
                     } catch (e) {
                         console.error('Error al descargar conector:', e);
                         showToast('No se pudo descargar el conector', 'error');
@@ -655,8 +550,8 @@
                         a.click();
                         // ⚠️ dar tiempo a que el navegador inicie la descarga antes de revocar el blob
                         setTimeout(() => {
-                            URL.revokeObjectURL(url);
-                            a.remove();
+                          URL.revokeObjectURL(url);
+                          a.remove();
                         }, 1500);
                     } catch (err) {
                         console.error(err);
@@ -670,5 +565,4 @@
         });
     </script>
 </body>
-
 </html>

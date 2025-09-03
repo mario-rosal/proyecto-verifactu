@@ -9,7 +9,7 @@ import { AuthGuard } from './auth/auth.guard';
 import { CreateEventDto } from './dto/create-event.dto'; // <-- 1. Importar el nuevo DTO
 import { ApiKeyGuard } from './auth/apikey.guard'; // <-- 2. Importar el nuevo guardián
 
-@Controller('v1')
+@Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
 

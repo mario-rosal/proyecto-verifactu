@@ -1,4 +1,5 @@
 Memoria: El Proyecto VeriFactu
+
 Este documento sirve como un registro técnico y estratégico completo del proyecto VeriFactu, desde su concepción hasta la finalización de la fase de desarrollo principal.
 
 1. El "Porqué": Visión Estratégica y Oportunidad de Mercado
@@ -20,10 +21,11 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Stack: NestJS (TypeScript), TypeORM, PostgreSQL.
    Rol: Es el "guardián del estado y la lógica de negocio". Gestiona la API REST, la base de datos, la autenticación de usuarios (con bcrypt y JWT), la lógica de "Trabajos" asíncronos y la generación de API Keys.
    Endpoints relevantes:
-   - **POST /connector-package** *(JWT-only)*: genera una **API Key dedicada** para el tenant, construye y devuelve un **ZIP** con:
+   - **POST /v1/connector-package** *(JWT-only)*: genera una **API Key dedicada** para el tenant, construye y devuelve un **ZIP** con:
      - `config.json` `{ apiKey, tenantId }`
      - Binarios del conector **(instalador Windows Electron/NSIS si está disponible en `verifactu-printer-connector/bin`)**
      Además, registra en `event_log` un `CONFIG_UPDATE` con `details.action = CONNECTOR_PACKAGE_GENERATED`.
+     **Estabilización de descarga:** respuesta con `Content-Type: application/zip`, `Content-Disposition` (nombre de archivo) y **`Content-Length`** fijo; CORS expone `Content-Disposition` y permite `Authorization`. Verificado por `curl` y navegadores modernos.
    Conector AEAT (verifactu-connector):
    Stack: NestJS (TypeScript), soap.
    Rol: El "servicio de mensajería" especializado en la comunicación SOAP con la AEAT.
@@ -44,6 +46,7 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Capacidades del Dashboard (estado actual):
    - Listado de facturas y descarga del **PDF oficial Veri*Factu** (sello + QR).
    - **Gestión de API Keys** (listar, crear —se muestra solo una vez—, revocar) protegida con JWT.
+   - **Descarga del Conector**: usa *File System Access API* cuando está disponible para mostrar **“Guardar como…”** y escritura por *streaming* con progreso visible; *fallback* a Blob + `&lt;a download&gt;`. Compatible con `Authorization` + CORS.
    Conector de Escritorio (verifactu-printer-connector):
    Stack: Electron, chokidar, electron-store, axios.
    Rol: El "mensajero". Una aplicación ligera que vigila una carpeta, lee la API Key de un config.json y envía los nuevos PDFs a n8n.
@@ -108,10 +111,12 @@ Este documento sirve como un registro técnico y estratégico completo del proye
     (contenido original + sello + QR verificable)
    ```
 4. El "Hacia Dónde": Próximos Pasos
-   Con el desarrollo funcional principal ya completado, el proyecto entra en su fase final de preparación para el lanzamiento.
-   Generación del Documento Final: El siguiente gran paso es implementar la generación del PDF oficial de la factura, que incluya el código QR y la leyenda "VERI\*FACTU". Esto se hará en un nuevo flujo de n8n que tomará los datos de la factura ya sellada.
-   Empaquetado y Despliegue: **Ya usamos electron-builder (NSIS)** para generar el instalador del conector y la **descarga personalizada** desde el dashboard está implementada mediante `POST /connector-package` (ZIP con instalador + `config.json`). Paralelamente, desplegaremos nuestros servicios de backend y n8n en una infraestructura en la nube.
-   Integración Real con la AEAT: El último paso será obtener un certificado de sello electrónico oficial y "cambiar el enchufe" del verifactu-connector, pasando de nuestro simulador al entorno de producción de la Agencia Tributaria.
+   Con el desarrollo funcional principal ya completado, el proyecto entra en preparación de lanzamiento y optimización:
+   - **Optimización del instalador (tamaño):** mantener `asar: true`, `compression: "maximum"` y exclusión de test/ejemplos/maps en `electron-builder`; evaluar **`nsis-web`** (web installer) para reducir el binario distribuido desde el dashboard a un *stub* de pocos MB.
+   - **Distribución:** mantener ZIP con `config.json` + artefacto de instalación; alternativa futura: publicar hash/firmas para verificación de integridad.
+   - **Robustez del conector:** `awaitWriteFinish` en *watcher* y reintentos exponenciales ante archivos en escritura en Windows.
+   - **Operación:** despliegue del BFF y n8n gestionado; observabilidad mínima (health checks y métricas básicas).
+   - **Integración real con AEAT:** obtención de certificado de sello electrónico y *switch-over* del conector del simulador al endpoint oficial.
 5. Flujo Completo: De Cero a Factura Legal
    Aquí se detalla el viaje completo del usuario, desde que descubre el servicio hasta que emite su primera factura 100% legal.
    Fase A: Onboarding y Puesta en Marcha
@@ -137,7 +142,7 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    El segundo workflow de n8n realiza las validaciones finales (NIF del receptor, etc.).
    Llama al endpoint inteligente del bff para que calcule el hash encadenado y guarde el registro oficial de la factura (invoice_record) en la base de datos.
    Finalmente, le pasa la factura ya sellada al verifactu-connector para su comunicación con la AEAT (simulada).
-   Generación del Documento Final (Próximo Sprint): Un último paso (aún por construir) tomará los datos de la factura sellada y generará un nuevo PDF. Este documento incluirá el código QR y la leyenda "VERI\*FACTU".
+   **Generación del Documento Final (Consolidado):** el BFF genera el PDF oficial con QR y leyenda "VERI*FACTU" y lo expone vía `GET /invoices/:id/pdf/stamped`.
    Disponibilidad en el Dashboard: El dueño del restaurante, al entrar en su dashboard.html, verá la nueva factura en su listado, con el estado "Completado". Desde ahí, podrá descargar el PDF oficial y legal, que es el que debe entregar a su cliente.
 
 6. El Principio de la "Fuente Única de la Verdad" (Single Source of Truth)
