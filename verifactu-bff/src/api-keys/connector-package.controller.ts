@@ -1,4 +1,4 @@
-import { Controller, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Get, Param, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiKeysService } from './api-keys.service';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -8,6 +8,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as archiver from 'archiver';
 import { PassThrough } from 'stream';
+import * as os from 'os';
+import * as crypto from 'crypto';
 
 @Controller('connector-package')
 export class ConnectorPackageController {
@@ -16,6 +18,36 @@ export class ConnectorPackageController {
     @InjectRepository(EventLog)
     private readonly eventLogRepo: Repository<EventLog>,
   ) {}
+
+  // ---- helpers de tickets (HMAC SHA-256, exp unix-ms) ----
+  private ticketSecret(): Buffer {
+    const raw = process.env.DOWNLOAD_TICKET_SECRET || 'change-me-dev-secret';
+    return Buffer.from(raw, 'utf8');
+  }
+  private b64u(buf: Buffer): string {
+    return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
+  private unb64u(str: string): Buffer {
+    const pad = 4 - (str.length % 4 || 4);
+    const b64 = str.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat(pad);
+    return Buffer.from(b64, 'base64');
+  }
+  private signTicket(payload: object): string {
+    const body = Buffer.from(JSON.stringify(payload), 'utf8');
+    const sig = crypto.createHmac('sha256', this.ticketSecret()).update(body).digest();
+    return `${this.b64u(body)}.${this.b64u(sig)}`;
+  }
+  private verifyTicket(token: string): any {
+    const [b, s] = token.split('.');
+    if (!b || !s) throw new UnauthorizedException('Token inválido');
+    const body = this.unb64u(b);
+    const expect = crypto.createHmac('sha256', this.ticketSecret()).update(body).digest();
+    const got = this.unb64u(s);
+    if (!crypto.timingSafeEqual(expect, got)) throw new UnauthorizedException('Firma inválida');
+    const json = JSON.parse(body.toString('utf8'));
+    if (typeof json.exp !== 'number' || Date.now() > json.exp) throw new UnauthorizedException('Token expirado');
+    return json;
+  }
 
   /**
    * POST /connector-package (JWT-only)
@@ -75,73 +107,14 @@ export class ConnectorPackageController {
     // 3.a) Añadir config.json al ZIP
     archive.append(configBuffer, { name: 'config.json' });
 
-    // 3.b) Incluir instalador del conector (robusto en monorepo Windows/Linux)
-    // Ruta base esperada: <monorepo>/verifactu-printer-connector/bin
-    const tryDirs = [
-      // si Nest corre desde TS (ts-node): __dirname = verifactu-bff/src/api-keys
-      path.resolve(__dirname, '..', '..', '..', 'verifactu-printer-connector', 'bin'),
-      // si Nest corre desde dist:
-      path.resolve(__dirname, '..', '..', '..', '..', 'verifactu-printer-connector', 'bin'),
-      // cwd del proceso (normalmente verifactu-bff):
-      path.resolve(process.cwd(), '..', 'verifactu-printer-connector', 'bin'),
-    ];
-
-    const firstExistingDir = tryDirs.find(d => {
-      try { return fs.existsSync(d) && fs.statSync(d).isDirectory(); } catch { return false; }
-    });
-
-    // Selección única de artefacto: preferir "WebSetup" (nsis-web) si existe, luego "Setup" completo.
-    let addedExecutable = false;
-    if (variant !== 'config' && firstExistingDir) {
-      try {
-        const entries = fs.readdirSync(firstExistingDir, { withFileTypes: true });
-        const files = entries.filter(e => e.isFile()).map(e => e.name);
-
-        // Candidatos
-        const webExe = files.find(n => /WebSetup.*\.exe$/i.test(n) || /nsis[-_.]?web.*\.exe$/i.test(n));
-        const fullExe = files.find(n => /Setup.*\.exe$/i.test(n));
-
-        let chosen: string | null = null;
-        if (variant === 'web') {
-          chosen = webExe || null;
-        } else if (variant === 'full') {
-          // elegir "full", pero si no existe, caer al web
-          chosen = fullExe || webExe || null;
-        } else {
-          // por defecto: preferir web si está disponible
-          chosen = webExe || fullExe || null;
-        }
-
-        if (chosen) {
-          const abs = path.join(firstExistingDir, chosen);
-          archive.file(abs, { name: 'bin/' + path.basename(abs) });
-          addedExecutable = true;
-        } else {
-          // No hay .exe; incluir carpeta por si existe portable (win-unpacked) u otros binarios
-          archive.directory(firstExistingDir, 'bin');
-        }
-      } catch {
-        // fallback abajo
-      }
-    }
-    if (!firstExistingDir || variant === 'config') {
-      // Solo config / o no existe bin: incluir README de cortesía
-      archive.append(
-        Buffer.from(
-          'No se adjuntó instalador. Usa el instalador existente y coloca este config.json en la ruta indicada.\n',
-          'utf8',
-        ),
-        { name: 'bin/README.txt' },
-      );
-    } else if (!addedExecutable) {
-      // No se pudo elegir ejecutable, añadir README explicativo
-      archive.append(
-        Buffer.from(
-          'Binarios no encontrados. Compila el conector (electron-builder) en verifactu-printer-connector/bin.\n',
-          'utf8',
-        ),
-        { name: 'bin/README.txt' },
-      );
+    // Añadir únicamente el/los instalador(es) .exe
+    const binPath = path.join(__dirname, '../../../verifactu-printer-connector/bin');
+    if (fs.existsSync(binPath)) {
+      const files = fs.readdirSync(binPath);
+      const exeFiles = files.filter(f => f.endsWith('.exe'));
+      exeFiles.forEach(exeFile => {
+        archive.file(path.join(binPath, exeFile), { name: exeFile });
+      });
     }
 
     // 4) Registrar evento en event_log (antes de cerrar el ZIP)
@@ -165,5 +138,99 @@ export class ConnectorPackageController {
     res.setHeader('Content-Disposition', `attachment; filename="verifactu-connector-${tenantId}.zip"`);
     res.setHeader('Content-Length', String(buffer.length));
     res.end(buffer);
+  }
+
+  /**
+   * POST /connector-package/tickets (JWT-only)
+   * - Genera API Key y prepara ZIP temporal
+   * - Devuelve { url, filename, size, expiresAt } con token firmado (expira)
+   */
+  @Post('tickets')
+  async createDownloadTicket(@Req() req: any, @Res() res: Response) {
+    const authHeader = (req.headers?.authorization || '') as string;
+    let tenantId: number = Number(req.user?.tenantId);
+    if (!Number.isInteger(tenantId)) {
+      try {
+        const raw = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+        const payloadB64 = raw.split('.')[1] || '';
+        const json = payloadB64 ? JSON.parse(Buffer.from(payloadB64, 'base64').toString('utf8')) : {};
+        const claim = (json?.tenantId ?? json?.tenant_id ?? json?.tid);
+        if (claim !== undefined && claim !== null) tenantId = Number(claim);
+      } catch { /* noop */ }
+    }
+    if (!Number.isInteger(tenantId)) throw new UnauthorizedException('Tenant no resuelto desde JWT');
+
+    // Generar API Key
+    const { apiKey } = await this.apiKeysService.createKey(tenantId);
+
+    // config.json
+    const config = { apiKey, tenantId };
+    const configBuffer = Buffer.from(JSON.stringify(config, null, 2), 'utf8');
+
+    // ZIP temporal
+    const tmpName = `verifactu-connector-${tenantId}-${Date.now()}.zip`;
+    const tmpPath = path.join(os.tmpdir(), tmpName);
+    await new Promise<void>((resolve, reject) => {
+      const out = fs.createWriteStream(tmpPath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      out.on('close', () => resolve());
+      out.on('error', reject);
+      archive.on('error', reject);
+      archive.pipe(out);
+      archive.append(configBuffer, { name: 'config.json' });
+      const binPath = path.join(__dirname, '../../../verifactu-printer-connector/bin');
+      if (fs.existsSync(binPath)) {
+        const files = fs.readdirSync(binPath);
+        const exeFiles = files.filter(f => f.endsWith('.exe'));
+        exeFiles.forEach(exeFile => {
+          archive.file(path.join(binPath, exeFile), { name: exeFile });
+        });
+      }
+      archive.finalize().catch(reject);
+    });
+
+    // Log
+    await this.eventLogRepo
+      .createQueryBuilder()
+      .insert()
+      .into(EventLog)
+      .values({
+        tenantId,
+        eventType: 'CONFIG_UPDATE',
+        details: { action: 'CONNECTOR_PACKAGE_GENERATED', ticket: true },
+      })
+      .execute();
+
+    const stat = fs.statSync(tmpPath);
+    const expMs = Date.now() + 10 * 60 * 1000; // 10 min
+    const token = this.signTicket({ tenantId, p: tmpName, exp: expMs });
+    const urlPath = `/v1/connector-package/tickets/${encodeURIComponent(token)}`;
+
+    res.status(201).json({
+      url: urlPath,
+      filename: `verifactu-connector-${tenantId}.zip`,
+      size: stat.size,
+      expiresAt: expMs,
+    });
+  }
+
+  /**
+   * GET /connector-package/tickets/:token
+   * - Valida token y expiración
+   * - Sirve el ZIP y borra el artefacto temporal al finalizar
+   */
+  @Get('tickets/:token')
+  async downloadByTicket(@Param('token') token: string, @Res() res: Response) {
+    const data = this.verifyTicket(token);
+    const tmpPath = path.join(os.tmpdir(), data.p);
+    if (!fs.existsSync(tmpPath)) throw new UnauthorizedException('Artefacto no disponible');
+    const stat = fs.statSync(tmpPath);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="verifactu-connector-${data.tenantId}.zip"`);
+    res.setHeader('Content-Length', String(stat.size));
+    const stream = fs.createReadStream(tmpPath);
+    stream.pipe(res);
+    stream.on('close', () => { fs.unlink(tmpPath, () => {}); });
+    stream.on('error', () => { try { fs.unlinkSync(tmpPath); } catch {} res.end(); });
   }
 }

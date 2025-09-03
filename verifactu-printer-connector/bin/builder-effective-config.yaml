@@ -10,7 +10,12 @@ files:
       - '!bin/**'
       - '!config.json'
       - '!**/*.map'
+      - '!**/tests/**'
+      - '!**/test/**'
+      - '!**/docs/**'
+      - '!**/examples/**'
 asar: true
+compression: maximum
 win:
   target:
     - target: nsis
@@ -20,4 +25,5 @@ nsis:
   oneClick: true
   perMachine: false
   allowToChangeInstallationDirectory: false
+  deleteAppDataOnUninstall: true
 electronVersion: 31.7.7

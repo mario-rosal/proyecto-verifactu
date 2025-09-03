@@ -4,6 +4,8 @@
 // ========================================================================
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
+import envValidation from './config/env.validation';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { Tenant } from './entities/tenant.entity';
@@ -20,6 +22,12 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
 
 @Module({
   imports: [
+    // Config global + validación .env
+    ConfigModule.forRoot({
+      isGlobal: true,
+      cache: true,
+      validate: envValidation,
+    }),
     InvoicesModule,
     ApiKeysModule,
     HealthModule,

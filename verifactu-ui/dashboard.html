@@ -504,45 +504,10 @@
             // ------------------ DESCARGA DEL CONECTOR ("Guardar como..." + progreso) ------------------
             const btnDownloadConnector = document.getElementById('btnDownloadConnector');
 
-            const filenameFromCD = (cd) => {
-                if (!cd) return null;
-                // Intentar filename*=UTF-8''... primero
-                let m = cd.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
-                if (m && m[1]) return decodeURIComponent(m[1].replace(/"/g, ''));
-                // Fallback a filename="..."
-                m = cd.match(/filename\s*=\s*"([^"]+)"/i);
-                if (m && m[1]) return m[1];
-                // Fallback a filename=simple
-                m = cd.match(/filename\s*=\s*([^;]+)/i);
-                if (m && m[1]) return m[1].trim();
-                return null;
-            };
-
-            async function downloadConnectorZipSaveAs() {
-                // 0) Nombre sugerido por defecto (por si el picker se abre antes del fetch)
-                let suggested = 'verifactu-connector.zip';
-
-                // A. Si existe File System Access API, abrir el picker **ANTES** de hacer await alguno
-                //    (para no perder la "user activation" del click).
-                let handle = null;
-                if ('showSaveFilePicker' in window) {
-                    try {
-                        handle = await window.showSaveFilePicker({
-                            suggestedName: suggested,
-                            types: [{ description: 'ZIP', accept: { 'application/zip': ['.zip'] } }]
-                        });
-                    } catch (err) {
-                        if (err && err.name === 'AbortError') {
-                            showToast('Descarga cancelada', 'info');
-                            return;
-                        }
-                        // Si falla por políticas, seguimos con el flujo fallback más abajo
-                        handle = null;
-                    }
-                }
-
-                // B) Hacer la petición con Authorization (soporta CORS)
-                const resp = await fetch(`${bffBaseUrl}/v1/connector-package?variant=config`, {
+            // Nueva implementación: ticket efímero (POST) + navegación (GET) para descarga nativa
+            async function downloadConnectorNative() {
+                // 1) Pedir ticket con JWT
+                const resp = await fetch(`${bffBaseUrl}/v1/connector-package/tickets`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
@@ -553,50 +518,22 @@
                 }
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-                // C) Resolver nombre propuesto desde Content-Disposition
-                const cd = resp.headers.get('Content-Disposition') || '';
-                suggested = filenameFromCD(cd) || suggested;
-
-                // D) Si tenemos handle, escribir el stream directamente al archivo elegido
-                if (handle && resp.body) {
-                    const writable = await handle.createWritable();
-                    const reader = resp.body.getReader();
-
-                    const totalStr = resp.headers.get('Content-Length');
-                    const total = totalStr ? Number(totalStr) : 0;
-                    let received = 0;
-                    btnDownloadConnector.textContent = 'Descargando... 0 MB';
-
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        await writable.write(value);
-                        received += value.byteLength || value.length || 0;
-                        const mb = (received / (1024 * 1024)).toFixed(1);
-                        if (total > 0) {
-                            const pct = Math.floor((received / total) * 100);
-                            btnDownloadConnector.textContent = `Descargando... ${pct}% (${mb} MB)`;
-                        } else {
-                            btnDownloadConnector.textContent = `Descargando... ${mb} MB`;
-                        }
-                    }
-                    await writable.close();
-                    showToast('Conector guardado correctamente', 'success');
-                    return;
+                const data = await resp.json(); // { url, filename, size, expiresAt }
+                let absolute = data.url || '';
+                if (!absolute) throw new Error('Respuesta sin URL de descarga');
+                if (!/^https?:\/\//i.test(absolute)) {
+                    absolute = `${bffBaseUrl}${absolute}`;
                 }
 
-                // E) Fallback universal: Blob + descarga automática
-                const blob = await resp.blob();
-                const url = URL.createObjectURL(blob);
+                // 2) Lanzar descarga nativa del navegador (sin fetch/XHR)
                 const a = document.createElement('a');
-                a.href = url;
-                a.download = suggested;
+                a.href = absolute;
+                a.rel = 'noopener';
                 document.body.appendChild(a);
                 a.click();
-                setTimeout(() => {
-                    URL.revokeObjectURL(url);
-                    a.remove();
-                }, 1500);
+                a.remove();
+
+                // Mensaje informativo (la barra real la muestra el navegador)
                 showToast('Descarga iniciada', 'success');
             }
 
@@ -604,8 +541,8 @@
                 btnDownloadConnector.addEventListener('click', async () => {
                     try {
                         btnDownloadConnector.disabled = true;
-                        btnDownloadConnector.textContent = 'Preparando...';
-                        await downloadConnectorZipSaveAs();
+                        btnDownloadConnector.textContent = 'Preparando descarga...';
+                        await downloadConnectorNative();
                     } catch (e) {
                         console.error('Error al descargar conector:', e);
                         showToast('No se pudo descargar el conector', 'error');

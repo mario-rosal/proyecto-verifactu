@@ -33,9 +33,14 @@
       "**/*",
       "!bin/**",
       "!config.json",
-      "!**/*.map"
+      "!**/*.map",
+      "!**/tests/**",
+      "!**/test/**",
+      "!**/docs/**",
+      "!**/examples/**"
     ],
     "asar": true,
+    "compression": "maximum",
     "win": {
       "target": [
         {
@@ -49,7 +54,8 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": false
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": true
     }
   }
 }

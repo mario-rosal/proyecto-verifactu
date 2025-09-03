@@ -21,17 +21,37 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Stack: NestJS (TypeScript), TypeORM, PostgreSQL.
    Rol: Es el "guardián del estado y la lógica de negocio". Gestiona la API REST, la base de datos, la autenticación de usuarios (con bcrypt y JWT), la lógica de "Trabajos" asíncronos y la generación de API Keys.
    Endpoints relevantes:
-   - **POST /v1/connector-package** *(JWT-only)*: genera una **API Key dedicada** para el tenant, construye y devuelve un **ZIP** con:
-     - `config.json` `{ apiKey, tenantId }`
-     - Binarios del conector **(instalador Windows Electron/NSIS si está disponible en `verifactu-printer-connector/bin`)**
-     Además, registra en `event_log` un `CONFIG_UPDATE` con `details.action = CONNECTOR_PACKAGE_GENERATED`.
-     **Estabilización de descarga:** respuesta con `Content-Type: application/zip`, `Content-Disposition` (nombre de archivo) y **`Content-Length`** fijo; CORS expone `Content-Disposition` y permite `Authorization`. Verificado por `curl` y navegadores modernos.
-   Conector AEAT (verifactu-connector):
-   Stack: NestJS (TypeScript), soap.
-   Rol: El "servicio de mensajería" especializado en la comunicación SOAP con la AEAT.
-   Simulador AEAT (mock-server.js):
-   Stack: Node.js, Express.
-   Rol: Un simulador que nos sirve los archivos WSDL/XSD y emula las respuestas SOAP, permitiéndonos desarrollar de forma independiente y fiable.
+   - **POST /v1/connector-package** *(JWT-only)*
+     - Genera **API Key dedicada** y devuelve un **ZIP mínimo** con:
+       - `config.json` `{ apiKey, tenantId }`
+       - **Solo el instalador Windows (Electron/NSIS)** si existe en `verifactu-printer-connector/bin` (se **excluye** `win-unpacked/` para reducir tamaño).
+     - **Cabeceras**: `Content-Type: application/zip`, `Content-Disposition` (nombre) y **`Content-Length`** (determinista).
+     - **Logging**: `event_log` registra `CONFIG_UPDATE` `{ action: "CONNECTOR_PACKAGE_GENERATED" }`.
+
+   - **POST /v1/connector-package/tickets** *(JWT-only)*
+     - Crea el **ZIP temporal** en `os.tmpdir()` (mismo contenido que arriba) y devuelve:
+       `{ url, filename, size, expiresAt }`.
+     - Emite un **token efímero** firmado (HMAC-SHA256) con `exp` (por defecto 10 min).
+     - **Logging**: añade `ticket: true` en `details`.
+
+   - **GET /v1/connector-package/tickets/:token**
+     - **Valida** firma y expiración; sirve el ZIP con `Content-Disposition` + `Content-Length` y **borra** el artefacto al finalizar.
+     - No requiere JWT: el **token firmado** actúa como credencial temporal.
+
+   **Notas de producto**: con la exclusión de `win-unpacked/` el ZIP típico queda en **~75–79 MB** (instalador + config).
+
+    Conector AEAT (verifactu-connector):
+    Stack: NestJS (TypeScript), soap.
+    Rol: El "servicio de mensajería" especializado en la comunicación SOAP con la AEAT.
+ 
+   Seguridad (resumen):
+   - **ApiKeyGuard global (JWT OR x-api-key)** con *whitelist* mínima: `OPTIONS`, `GET /healthz`, `POST /v1/auth/login`, `GET /v1/jobs/:id`.
+   - **Rutas de tickets**: `GET /v1/connector-package/tickets/:token` permitido sin JWT **solo** con token válido (HMAC-SHA256 + `exp`).
+   - **Secreto**: `DOWNLOAD_TICKET_SECRET` (obligatorio en prod). Comparación de firmas con `timingSafeEqual`.
+
+    Simulador AEAT (mock-server.js):
+    Stack: Node.js, Express.
+    Rol: Un simulador que nos sirve los archivos WSDL/XSD y emula las respuestas SOAP, permitiéndonos desarrollar de forma independiente y fiable.
    Orquestador (n8n):
    Rol: El "sistema nervioso central". Gestiona todos los flujos de trabajo asíncronos (onboarding, procesamiento de facturas) y actúa como el punto de integración para la IA.
    Inteligencia Artificial (Google Gemini):
@@ -46,7 +66,12 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Capacidades del Dashboard (estado actual):
    - Listado de facturas y descarga del **PDF oficial Veri*Factu** (sello + QR).
    - **Gestión de API Keys** (listar, crear —se muestra solo una vez—, revocar) protegida con JWT.
-   - **Descarga del Conector**: usa *File System Access API* cuando está disponible para mostrar **“Guardar como…”** y escritura por *streaming* con progreso visible; *fallback* a Blob + `&lt;a download&gt;`. Compatible con `Authorization` + CORS.
+   - **Descarga del Conector**:
+     - Flujo **ticketizado**: `POST /v1/connector-package/tickets` → navegar a `GET /v1/connector-package/tickets/:token`.
+     - Usa *File System Access API* si está disponible para **“Guardar como…”** y progreso en botón; *fallback* universal a Blob + `&lt;a download&gt;`.
+     - Cabeceras expuestas: `Content-Disposition`; descargas con tamaño conocido (**`Content-Length`**).
+     - Compatible con CORS y `Authorization` (en el POST de ticket).
+
    Conector de Escritorio (verifactu-printer-connector):
    Stack: Electron, chokidar, electron-store, axios.
    Rol: El "mensajero". Una aplicación ligera que vigila una carpeta, lee la API Key de un config.json y envía los nuevos PDFs a n8n.
@@ -117,6 +142,12 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    - **Robustez del conector:** `awaitWriteFinish` en *watcher* y reintentos exponenciales ante archivos en escritura en Windows.
    - **Operación:** despliegue del BFF y n8n gestionado; observabilidad mínima (health checks y métricas básicas).
    - **Integración real con AEAT:** obtención de certificado de sello electrónico y *switch-over* del conector del simulador al endpoint oficial.
+   - **Optimización adicional de instalador (opcional):** evaluar **NSIS Web (web installer)** para reducir el binario a un *stub* y descargar componentes durante la instalación.
+
+   Evidencia técnica (descarga):
+   - `POST /v1/connector-package` → ZIP mínimo (`config.json` + `.exe`) con `Content-Length` estable **~78.6 MB**.
+   - `POST /v1/connector-package/tickets` → devuelve `url` firmada + `size`; `GET` posterior entrega el ZIP y elimina el temporal.
+   - `event_log` registra `CONFIG_UPDATE` en ambos flujos (con `ticket: true` cuando aplica).
 5. Flujo Completo: De Cero a Factura Legal
    Aquí se detalla el viaje completo del usuario, desde que descubre el servicio hasta que emite su primera factura 100% legal.
    Fase A: Onboarding y Puesta en Marcha

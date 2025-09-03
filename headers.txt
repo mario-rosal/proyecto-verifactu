@@ -1,0 +1,11 @@
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Vary: Origin
+Access-Control-Expose-Headers: Content-Disposition
+Content-Type: application/zip
+Content-Disposition: attachment; filename="verifactu-connector-1.zip"
+Content-Length: 78602008
+Date: Wed, 03 Sep 2025 17:18:45 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+

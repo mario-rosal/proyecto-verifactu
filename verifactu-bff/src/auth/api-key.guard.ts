@@ -15,6 +15,9 @@ export class ApiKeyGuard implements CanActivate {
     if (path === '/healthz') return true;             // health
     if (method === 'POST' && path === '/v1/auth/login') return true; // login sin JWT aún
     if (method === 'GET' && /^\/v1\/jobs\/[0-9a-fA-F-]{36}$/.test(path)) return true; // polling desde navegador
+    // Descarga del conector mediante ticket firmado (HMAC + exp). GET público sin Authorization.
+    // Se valida el token en el propio controlador antes de servir el ZIP.
+    if (method === 'GET' && /^\/v1\/connector-package\/tickets\/[^/]+$/.test(path)) return true;
 
     // 2) Si llega JWT Bearer, dejamos pasar; el guard de JWT hará su parte
     const authHeader: string | undefined =

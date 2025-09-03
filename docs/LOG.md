@@ -36,6 +36,26 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 
 ## Entradas (más reciente primero)
 
+## 2025-09-03 — BFF/Electron — ZIP mínimo + tickets de descarga nativos (finalizado)
+- **ZIP del conector**: ahora incluye **solo** `config.json` + `VeriFactu-Connector-Setup-*.exe` (sin `win-unpacked`). Tamaño observado estable **~75–79 MB** con `Content-Length` correcto.
+- **Endpoints**:
+  - `POST /v1/connector-package/tickets` (JWT) → genera API Key + crea ZIP temporal en `os.tmpdir()` y devuelve `{ url, filename, size, expiresAt }`.
+  - `GET /v1/connector-package/tickets/:token` → valida token HMAC (**SHA-256**) con expiración (**10 min**) y sirve el ZIP con `Content-Disposition` + `Content-Length`; borra el artefacto temporal al finalizar.
+- **UI** (`dashboard.html`): el botón **“Descargar Conector”** primero pide el **ticket** y luego navega a la **URL GET** para obtener **progreso nativo del navegador** / “Guardar como…”.
+- **Seguridad**:
+  - Token firmado con `DOWNLOAD_TICKET_SECRET` (HMAC SHA-256) + `exp`. Validación con `timingSafeEqual`.
+  - `ApiKeyGuard` permite **solo** el `GET /v1/connector-package/tickets/:token` sin JWT (el token actúa como credencial efímera). Resto de rutas siguen protegidas por **JWT o x-api-key**.
+- **Logging**: `event_log` registra `CONFIG_UPDATE` `{ action: "CONNECTOR_PACKAGE_GENERATED" }` y `{ ticket: true }` cuando aplica.
+- **Evidencia** (sesión): 
+  - `POST /v1/connector-package` → `Content-Length: 78602008` / ZIP con **2 ficheros** (`config.json` + `.exe`).
+  - `POST /v1/connector-package/tickets` → devuelve `url` firmada y `size: 78602009`.
+  - `GET /v1/connector-package/tickets/:token` → `200 OK` con `Content-Length: 78602009` y descarga correcta por GET.
+- **Notas**:
+  - `win-unpacked/` puede seguir existiendo **en disco local** tras `electron-builder`, pero **no** se incluye en el ZIP distribuido.
+  - Variable de entorno: **`DOWNLOAD_TICKET_SECRET`** (default dev: `change-me-dev-secret`).
+  - Próximo opcional: evaluar **`nsis-web`** para reducir aún más el tamaño inicial (stub).
+
+
 ## 2025-09-03 — BFF/Dashboard — Descarga “Guardar como…” + progreso (estabilizada)
 - **Endpoint**: `POST /v1/connector-package` (JWT). Respuesta `application/zip` con `Content-Disposition` (nombre de archivo) y **`Content-Length`** (descarga determinista).
 - **CORS**: `Access-Control-Allow-Headers: Authorization, Content-Type` y `Access-Control-Expose-Headers: Content-Disposition`; preflight `OPTIONS` verificado (204).
