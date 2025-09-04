@@ -12,7 +12,9 @@ export class ApiKeyGuard implements CanActivate {
 
     // 1) Whitelist mínimos: preflight, health, login y polling de jobs (onboarding)
     if (method === 'OPTIONS') return true;            // CORS preflight
-    if (path === '/healthz') return true;             // health
+    // Health (con y sin prefijo global 'v1')
+    if (path === '/healthz') return true;
+    if (path === '/v1/healthz') return true;
     if (method === 'POST' && path === '/v1/auth/login') return true; // login sin JWT aún
     if (method === 'GET' && /^\/v1\/jobs\/[0-9a-fA-F-]{36}$/.test(path)) return true; // polling desde navegador
     // Descarga del conector mediante ticket firmado (HMAC + exp). GET público sin Authorization.

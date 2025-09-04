@@ -148,6 +148,23 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    - `POST /v1/connector-package` → ZIP mínimo (`config.json` + `.exe`) con `Content-Length` estable **~78.6 MB**.
    - `POST /v1/connector-package/tickets` → devuelve `url` firmada + `size`; `GET` posterior entrega el ZIP y elimina el temporal.
    - `event_log` registra `CONFIG_UPDATE` en ambos flujos (con `ticket: true` cuando aplica).
+ 
+### Anexo A — Variables de entorno (producción y rotación)
+
+| Variable                          | Uso                                      | Notas |
+|-----------------------------------|-------------------------------------------|-------|
+| `NODE_ENV`                        | entorno                                   | `production` en despliegue |
+| `PORT`                            | puerto BFF                                | por defecto `3001` |
+| `CORS_ORIGINS`                    | **whitelist CORS** (coma-separado)        | ej. `https://app.midominio.com,https://admin.midominio.com` |
+| `JWT_SECRET`                      | firma/verificación JWT                    | secreto **obligatorio** |
+| `JWT_SECRET_NEXT` (opcional)      | **rotación** JWT                          | aceptar durante ventana de gracia |
+| `DOWNLOAD_TICKET_SECRET`          | HMAC tickets de descarga                  | secreto **obligatorio** |
+| `DOWNLOAD_TICKET_SECRET_NEXT` (op.)| **rotación** de tickets                   | verificación intenta ambos |
+
+**Operativa de rotación** (JWT/tickets):  
+1) Generar `*_NEXT`. 2) Desplegar con `*_NEXT` definido (aceptación dual).  
+3) Promocionar moviendo `*_NEXT` → `*` y vaciar `*_NEXT`. 4) Revocar el antiguo.
+
 5. Flujo Completo: De Cero a Factura Legal
    Aquí se detalla el viaje completo del usuario, desde que descubre el servicio hasta que emite su primera factura 100% legal.
    Fase A: Onboarding y Puesta en Marcha

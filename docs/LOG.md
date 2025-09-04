@@ -1,7 +1,7 @@
 # LOG del proyecto — VeriFactu
 
 &gt; Bitácora única y fuente de verdad para IA y equipo. Mantener breve, factual y actualizada.  
-&gt; **Última actualización:** 2025-09-03
+&gt; **Última actualización:** 2025-09-04
 
 ---
 
@@ -35,6 +35,41 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 ---
 
 ## Entradas (más reciente primero)
+
+## 2025-09-04 — BFF — Hardening para producción (completado)
+- **CORS whitelist por `.env`**: `CORS_ORIGINS=http://localhost:8080`.  
+  - Verificado:  
+    - `curl -i -H "Origin: http://localhost:8080" /v1/healthz` → `Access-Control-Allow-Origin: http://localhost:8080`.  
+    - `curl -i -H "Origin: https://evil.test" /v1/healthz` → **sin** `Access-Control-Allow-Origin`.
+- **Descarga por ticket endurecida**:
+  - `ApiKeyGuard` whitelistea `GET /(v\d+/)?connector-package/tickets/:token` (público solo por token).  
+  - **Rate limiting** activado (cabeceras `X-RateLimit-*` visibles).  
+  - **Rotación de secreto** de tickets soportada: `DOWNLOAD_TICKET_SECRET` + `DOWNLOAD_TICKET_SECRET_NEXT` (verificación intenta ambos).  
+  - Evidencia de flujo real:  
+    - `GET /v1/connector-package/tickets/TESTTOKEN123` → `401 {"message":"Token inválido"}`.  
+    - Firma con **NEXT** y prueba → `401 {"message":"Artefacto no disponible"}` (firma válida, artefacto no existe).  
+    - Token firmado con secreto actual **y** artefacto temporal presente → `200 OK`, `Content-Type: application/zip`, descarga de `dummy`, y borrado del temporal (`File exists after download? False`).
+- **Logging estructurado** (JSONL por día) + `x-request-id`:
+  - Archivo: `logs/app-YYYY-MM-DD.jsonl` (rotación diaria).  
+  - Ejemplo real:  
+    ```
+    {"time":"...","reqId":"...","method":"GET","url":"/v1/connector-package/tickets/TESTTOKEN123","ip":"::1","tenantId":null,"level":"error","status":401,"duration_ms":2,"error":{"name":"UnauthorizedException","message":"Token inválido"}}
+    ```
+- **Job de purga**: servicio de limpieza de tickets/ZIPs expirados registrado (ScheduleModule activo).  
+  - Además del borrado inmediato tras servir, queda limpieza periódica de temporales expirados.
+- **Tests e2e** (guard whitelist):  
+  - Nuevo `test/apikey-whitelist.e2e-spec.ts` valida que la ruta pública **salta** el guard global y responde `401 "Token inválido"` en el controlador (firma errónea), evitando exigir `x-api-key`.  
+  - `jest.config.js` añadido y `tsconfig.spec.json` ajustado (tipos de Jest) para estabilidad local de pruebas.
+- **Otros**:
+  - `main.ts`: CORS con whitelist (cuando `CORS_ORIGINS` está definido) y exposición de `x-request-id`.  
+  - `connector-package.controller`: verificación de ticket con HMAC SHA-256 y **rotación** (`*_NEXT`), throttling por endpoint.
+- **Variables de entorno relevantes**:
+  - `CORS_ORIGINS` (coma-separado).  
+  - `DOWNLOAD_TICKET_SECRET` y opcional `DOWNLOAD_TICKET_SECRET_NEXT`.  
+  - (Operativa de rotación de JWT definida; pendiente consolidar uso de `JWT_SECRET(_NEXT)` en todos los guards/estrategias si no lo estuvieran ya).
+- **Evidencia de cabeceras** observadas:
+  - `X-RateLimit-Limit: 10`, `X-RateLimit-Remaining: 9` en `GET /v1/connector-package/tickets/...`.  
+  - `Access-Control-Allow-Origin: http://localhost:8080` en origin permitido; ausencia en `https://evil.test`.
 
 ## 2025-09-03 — BFF/Electron — ZIP mínimo + tickets de descarga nativos (finalizado)
 - **ZIP del conector**: ahora incluye **solo** `config.json` + `VeriFactu-Connector-Setup-*.exe` (sin `win-unpacked`). Tamaño observado estable **~75–79 MB** con `Content-Length` correcto.

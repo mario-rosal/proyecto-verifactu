@@ -1,16 +1,18 @@
-import { Controller, Post, Get, Param, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Get, Param, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiKeysService } from './api-keys.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventLog } from '../event-log/event-log.entity';
 import * as fs from 'fs';
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import * as path from 'path';
 import * as archiver from 'archiver';
 import { PassThrough } from 'stream';
 import * as os from 'os';
 import * as crypto from 'crypto';
 
+@UseGuards(ThrottlerGuard)
 @Controller('connector-package')
 export class ConnectorPackageController {
   constructor(
@@ -22,6 +24,11 @@ export class ConnectorPackageController {
   // ---- helpers de tickets (HMAC SHA-256, exp unix-ms) ----
   private ticketSecret(): Buffer {
     const raw = process.env.DOWNLOAD_TICKET_SECRET || 'change-me-dev-secret';
+    return Buffer.from(raw, 'utf8');
+  }
+  private ticketSecretNext(): Buffer | null {
+    const raw = process.env.DOWNLOAD_TICKET_SECRET_NEXT;
+    if (!raw || !raw.length) return null;
     return Buffer.from(raw, 'utf8');
   }
   private b64u(buf: Buffer): string {
@@ -41,9 +48,21 @@ export class ConnectorPackageController {
     const [b, s] = token.split('.');
     if (!b || !s) throw new UnauthorizedException('Token inválido');
     const body = this.unb64u(b);
-    const expect = crypto.createHmac('sha256', this.ticketSecret()).update(body).digest();
     const got = this.unb64u(s);
-    if (!crypto.timingSafeEqual(expect, got)) throw new UnauthorizedException('Firma inválida');
+
+    // 1º intento: secreto actual
+    const expect1 = crypto.createHmac('sha256', this.ticketSecret()).update(body).digest();
+    if (!crypto.timingSafeEqual(expect1, got)) {
+      // 2º intento: secreto de rotación (si existe y es suficientemente largo)
+      const next = this.ticketSecretNext();
+      if (!next || next.length < 24) {
+        throw new UnauthorizedException('Firma inválida');
+      }
+      const expect2 = crypto.createHmac('sha256', next).update(body).digest();
+      if (!crypto.timingSafeEqual(expect2, got)) {
+        throw new UnauthorizedException('Firma inválida');
+      }
+    }
     const json = JSON.parse(body.toString('utf8'));
     if (typeof json.exp !== 'number' || Date.now() > json.exp) throw new UnauthorizedException('Token expirado');
     return json;
@@ -56,6 +75,8 @@ export class ConnectorPackageController {
    * - Devuelve application/zip por streaming
    * - Registra CONFIG_UPDATE { action: CONNECTOR_PACKAGE_GENERATED }
    */
+  // 3 req/min (ttl en ms)
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post()
   async createConnectorPackage(@Req() req: any, @Res() res: Response) {
     // Permite forzar variante: web | full | config
@@ -145,6 +166,8 @@ export class ConnectorPackageController {
    * - Genera API Key y prepara ZIP temporal
    * - Devuelve { url, filename, size, expiresAt } con token firmado (expira)
    */
+  // 5 req/min (ttl en ms)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('tickets')
   async createDownloadTicket(@Req() req: any, @Res() res: Response) {
     const authHeader = (req.headers?.authorization || '') as string;
@@ -219,6 +242,8 @@ export class ConnectorPackageController {
    * - Valida token y expiración
    * - Sirve el ZIP y borra el artefacto temporal al finalizar
    */
+  // 10 req/min (ttl en ms)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Get('tickets/:token')
   async downloadByTicket(@Param('token') token: string, @Res() res: Response) {
     const data = this.verifyTicket(token);

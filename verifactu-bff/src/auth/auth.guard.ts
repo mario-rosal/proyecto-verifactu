@@ -7,11 +7,15 @@
 
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -20,9 +24,30 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException();
     }
     try {
-      const payload = await this.jwtService.verifyAsync(token, {
-        secret: 'tu-secreto-muy-seguro-cambiar-en-produccion',
-      });
+      const primary = this.config.get<string>('JWT_SECRET');
+      const next = this.config.get<string>('JWT_SECRET_NEXT'); // opcional (rotación)
+      if (!primary) throw new UnauthorizedException();
+
+      let payload: any;
+      try {
+        // 1º intento con el secreto actual
+        payload = await this.jwtService.verifyAsync(token, { secret: primary });
+      } catch (e: any) {
+        // No reintentar si expiró
+        if (e && (e.name === 'TokenExpiredError' || e.message?.includes('expired'))) {
+          throw new UnauthorizedException();
+        }
+        // 2º intento con el secreto "NEXT" si está definido (ventana de gracia)
+        if (next && next.length >= 24) {
+          try {
+            payload = await this.jwtService.verifyAsync(token, { secret: next });
+          } catch {
+            throw new UnauthorizedException();
+          }
+        } else {
+          throw new UnauthorizedException();
+        }
+      }
       // Adjuntamos el payload del token a la request
       request['user'] = payload;
     } catch {

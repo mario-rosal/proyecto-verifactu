@@ -16,6 +16,8 @@
   "description": "",
   "dependencies": {
     "@nestjs/config": "^4.0.0",
+    "@nestjs/schedule": "^6.0.0",
+    "@nestjs/throttler": "^6.4.0",
     "joi": "^17.12.3",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.1.6",

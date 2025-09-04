@@ -23,10 +23,10 @@ async function bootstrap() {
 
   app.enableCors({
     origin: allowedOrigins,
-    credentials: false,                // no usamos cookies
+    credentials: false, // no usamos cookies
     methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-    allowedHeaders: ['Authorization','Content-Type'],
-    exposedHeaders: ['Content-Disposition'],
+    allowedHeaders: ['Authorization','Content-Type','x-api-key'],
+    exposedHeaders: ['Content-Disposition','x-request-id'],
     optionsSuccessStatus: 204,
     maxAge: 86400,
   });

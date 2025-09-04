@@ -5,7 +5,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
+import { TicketsPurgeService } from './api-keys/tickets-purge.service';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { RequestLoggerInterceptor } from './logging/request-logger.interceptor';
 import envValidation from './config/env.validation';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { Tenant } from './entities/tenant.entity';
@@ -28,6 +33,11 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
       cache: true,
       validate: envValidation,
     }),
+    // Base del rate limiting (no afecta rutas aún; se aplicará por controlador en el siguiente paso)
+    ThrottlerModule.forRoot([
+      { ttl: 60_000, limit: 100 } // set "default"
+    ]),
+    ScheduleModule.forRoot(),
     InvoicesModule,
     ApiKeysModule,
     HealthModule,
@@ -50,6 +60,14 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
     TypeOrmModule.forFeature([Tenant, InvoiceRecord, Job, User, ApiKey, EventLog]), // <-- 3. Registrarla para inyección
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    TicketsPurgeService, // job de purga de tickets/ZIPs caducados
+    // Logging estructurado global (JSONL + x-request-id)
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestLoggerInterceptor,
+    },
+  ],
 })
 export class AppModule {}

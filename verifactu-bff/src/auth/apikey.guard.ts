@@ -8,6 +8,17 @@ export class ApiKeyGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+
+    // Whitelist: descarga pública por ticket (acepta /v1/, /v2/, ...)
+    const path: string = request.path || request.url || '';
+    const method: string = (request.method || '').toUpperCase();
+    if (
+      method === 'GET' &&
+      /^\/(?:v\d+\/)?connector-package\/tickets\/[^/]+$/.test(path)
+    ) {
+      return true;
+    }
+
     const apiKey = this.extractKeyFromHeader(request);
     
     if (!apiKey) {

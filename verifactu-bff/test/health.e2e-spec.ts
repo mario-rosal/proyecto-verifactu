@@ -1,3 +1,5 @@
+/// <reference types="jest" />
+import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as request from 'supertest';
