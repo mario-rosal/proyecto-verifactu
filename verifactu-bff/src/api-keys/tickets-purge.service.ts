@@ -31,9 +31,15 @@ export class TicketsPurgeService implements OnModuleInit {
     }
   }
 
-  private purgeOnce(): void {
-    const dir = os.tmpdir();
-    const now = Date.now();
+  /**
+   * Ejecuta una pasada de purga.
+   * @param dirArg   Directorio base (por defecto, os.tmpdir()). Útil para tests.
+   * @param nowMs    Marca de tiempo "actual" (por defecto, Date.now()). Útil para tests.
+   * @returns        Cantidad de archivos eliminados.
+   */
+  public purgeOnce(dirArg?: string, nowMs?: number): number {
+    const dir = dirArg ?? os.tmpdir();
+    const now = nowMs ?? Date.now();
     let removed = 0;
     for (const file of fs.readdirSync(dir)) {
       const m = this.PATTERN.exec(file);
@@ -51,8 +57,8 @@ export class TicketsPurgeService implements OnModuleInit {
         }
       }
     }
-    if (removed > 0) {
-      this.logger.log(`Purgados ${removed} paquetes expirados en ${dir}`);
-    }
+    // Log SIEMPRE, incluso si removed=0 (criterio de aceptación)
+    this.logger.log(`purged ${removed} files`);
+    return removed;
   }
 }

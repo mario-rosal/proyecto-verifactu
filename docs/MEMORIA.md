@@ -50,7 +50,8 @@ Este documento sirve como un registro técnico y estratégico completo del proye
 
    Seguridad (resumen):
 
-   - **Cabeceras de seguridad (Helmet)** *(nuevo)*:
+   - **Cabeceras de seguridad (Helmet)** _(nuevo)_:
+
      - **CSP** compatible con el dashboard: en **dev** permite `'unsafe-inline'` y `'unsafe-eval'`; en **producción** es más estricta (sin `'unsafe-eval'`).
      - **X-Frame-Options**: `DENY` y **`frame-ancestors 'none'`** en la propia CSP para impedir _embedding_ no autorizado.
      - **Referrer-Policy**: `strict-origin-when-cross-origin`.
@@ -63,7 +64,7 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    - **Descargas con ticket**: `GET /v1/connector-package/tickets/:token` permitido sin JWT **solo** con token HMAC válido (`DOWNLOAD_TICKET_SECRET`) y `exp`; verificación con `timingSafeEqual`.
    - **Sin secretos hardcodeados**: `JwtModule` y validadores leen de `.env`; `JWT_SECRET_NEXT` es **opcional** y solo para rotación segura.
 
-   - **E2E de tickets (BFF)** *(nuevo)*:
+   - **E2E de tickets (BFF)** :
      - Cobertura (GET `/v1/connector-package/tickets/:token`):
        - ✅ **Éxito** → `200 OK`, `Content-Type: application/zip`, `Content-Length` **exacto** y `> 0`, **borrado** del ZIP temporal al finalizar.
        - ❌ **Firma inválida** → `401 {"message":"Firma inválida"}`.
@@ -72,7 +73,10 @@ Este documento sirve como un registro técnico y estratégico completo del proye
        - 🔓 **Ruta pública/whitelist** (sin JWT/x-api-key) con **token malformado** → `401 {"message":"Token inválido"}`.
      - Objetivo: asegurar verificabilidad (cabeceras correctas como `Content-Length`) y que **no se re-sirve** ni **re-crea** el artefacto temporal.
      - Estado: suites e2e en verde; se mantiene el test de whitelist existente.
-
+   - **Servicio de purga de temporales (nuevo):**
+     - El BFF incluye un servicio `TicketsPurgeService` que elimina los artefactos ZIP temporales en `os.tmpdir()` cuando han superado el TTL+GRACE.
+     - Ahora emite siempre un log único por ejecución con el formato `purged N files` (N puede ser 0).
+     - Se añadió un test unitario aislado que simula un directorio temporal y verifica tanto el borrado de archivos expirados como el log esperado.
 
    Simulador AEAT (mock-server.js):
    Stack: Node.js, Express.
@@ -101,8 +105,9 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Conector de Escritorio (verifactu-printer-connector):
    Stack: Electron, chokidar, electron-store, axios.
    Rol: El "mensajero". Una aplicación ligera que vigila una carpeta, lee la API Key de un config.json y envía los nuevos PDFs a n8n.
- 
+
    **Backups & Restore (consolidado):**
+
    - **Scripts de backup** (BFF):
      - Windows (PowerShell): `verifactu-bff/scripts/backup/backup.ps1`
      - Bash opcional: `verifactu-bff/scripts/backup/backup.sh`
