@@ -20,6 +20,7 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Backend (verifactu-bff):
    Stack: NestJS (TypeScript), TypeORM, PostgreSQL.
    Rol: Es el "guardián del estado y la lógica de negocio". Gestiona la API REST, la base de datos, la autenticación de usuarios (con bcrypt y JWT), la lógica de "Trabajos" asíncronos y la generación de API Keys.
+
    Endpoints relevantes:
 
    - **POST /v1/connector-package** _(JWT-only)_
@@ -48,6 +49,14 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Rol: El "servicio de mensajería" especializado en la comunicación SOAP con la AEAT.
 
    Seguridad (resumen):
+
+   - **Cabeceras de seguridad (Helmet)** *(nuevo)*:
+     - **CSP** compatible con el dashboard: en **dev** permite `'unsafe-inline'` y `'unsafe-eval'`; en **producción** es más estricta (sin `'unsafe-eval'`).
+     - **X-Frame-Options**: `DENY` y **`frame-ancestors 'none'`** en la propia CSP para impedir _embedding_ no autorizado.
+     - **Referrer-Policy**: `strict-origin-when-cross-origin`.
+     - **HSTS**: activado **solo en producción/HTTPS**; desactivado en desarrollo (HTTP) para evitar falsos positivos.
+     - **CORS**: **sin cambios** respecto a la configuración previa (whitelist por `CORS_ORIGINS`, mismos headers expuestos).
+     - **Verificación**: `HEAD /v1/healthz` muestra las cabeceras; en dev **no** aparece `Strict-Transport-Security`.
 
    - **Autenticación JWT**: emisión firmada con **`JWT_SECRET`**; durante rotación, las rutas protegidas **aceptan también** tokens firmados con **`JWT_SECRET_NEXT`** (ventana de gracia).
    - **ApiKeyGuard global (JWT OR x-api-key)** con _whitelist_ mínima: `OPTIONS`, `GET /healthz`, `POST /v1/auth/login`, `GET /v1/jobs/:id`, `GET /v1/connector-package/tickets/:token` (token firmado).
@@ -81,6 +90,15 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Conector de Escritorio (verifactu-printer-connector):
    Stack: Electron, chokidar, electron-store, axios.
    Rol: El "mensajero". Una aplicación ligera que vigila una carpeta, lee la API Key de un config.json y envía los nuevos PDFs a n8n.
+ 
+   **Backups & Restore (consolidado):**
+   - **Scripts de backup** (BFF):
+     - Windows (PowerShell): `verifactu-bff/scripts/backup/backup.ps1`
+     - Bash opcional: `verifactu-bff/scripts/backup/backup.sh`
+   - **Funcionamiento:** ejecutan `pg_dump` contra la BD del BFF y generan un artefacto con timestamp en `verifactu-bff/backups/`. Si existe `verifactu-bff/logs/*.jsonl`, se copian al backup.
+   - **Requisitos:** tener disponible `pg_dump`. En Windows puede usarse el binario del runtime de pgAdmin 4 (p. ej. `C:\Users\<usuario>\AppData\Local\Programs\pgAdmin 4\runtime\pg_dump.exe`) pasándolo como parámetro al script.
+   - **Restore:** ver guía `verifactu-bff/docs/RESTORE.md` con el **orden exacto**: definir `DATABASE_URL` o variables `PG*` → descomprimir → crear BD si no existe → `psql -f dump.sql`.
+   - **Nota conocida:** si durante el restore aparece el error `unrecognized configuration parameter "transaction_timeout"`, quitar la línea `SET transaction_timeout` del `.sql` antes de ejecutarlo (según versión/entorno).
 
 3. El "Qué": Resumen del Progreso por Sprints
    Sprint 1 (Cimientos): Se construyó el motor del backend (bff y connector) y se tomó la decisión estratégica de crear el simulador para garantizar la velocidad del desarrollo.

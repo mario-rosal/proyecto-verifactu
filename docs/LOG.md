@@ -1,7 +1,7 @@
 # LOG del proyecto — VeriFactu
 
 &gt; Bitácora única y fuente de verdad para IA y equipo. Mantener breve, factual y actualizada.  
-&gt; **Última actualización:** 2025-09-04
+&gt; **Última actualización:** 2025-09-05
 
 ---
 
@@ -22,7 +22,7 @@
 
 ## Contrato de datos para el PDF
 
-Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`  
+Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`
 (opcional visibles: `base_total`, `cuota_total`).
 
 ## Reglas de uso del LOG
@@ -35,6 +35,28 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 ---
 
 ## Entradas (más reciente primero)
+
+## 2025-09-05 — BFF — Cabeceras de seguridad (helmet)
+
+- **Dependencia** añadida: `helmet` (runtime).
+- **`src/main.ts`**: se aplica `helmet` sin tocar CORS existente.
+  - **CSP** (`helmet.contentSecurityPolicy`): perfil **dev** laxo (`'unsafe-inline'`, `'unsafe-eval'` para no romper dashboard) y **prod** más estricto.
+  - **X-Frame-Options** (`helmet.frameguard`): `DENY` (además de `frame-ancestors 'none'` en CSP).
+  - **Referrer-Policy**: `strict-origin-when-cross-origin`.
+  - **HSTS** (`helmet.hsts`): **solo en producción/HTTPS**.
+- **CORS**: sin cambios (misma whitelist por `CORS_ORIGINS`, mismos headers).
+- **Smoke test** en dev (HTTP): `HEAD /v1/healthz` devuelve
+  - `Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; ...`
+  - `X-Frame-Options: DENY`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - No aparece `Strict-Transport-Security`.
+
+## 2025-09-05 — Backups & restore mínimo (Windows verificado)
+
+- **Scripts** añadidos: `scripts/backup/backup.ps1` (PowerShell) y `scripts/backup/backup.sh` (bash opcional); **doc**: `docs/RESTORE.md`.
+- **Backup** probado en Windows con runtime de pgAdmin 4 (`pg_dump.exe`): genera ZIP con timestamp y **tamaño &gt; 0** y copia `logs/*.jsonl` si existen.
+- **Restore** verificado en BD `verifactu_bff_restore_test` con `psql`; **nota**: si aparece `unrecognized configuration parameter "transaction_timeout"`, quitar esa línea del `.sql` antes de ejecutar.
+- **Sin cambios** en CI ni esquema de BD; uso de `DATABASE_URL` o variables `PG*` para conexión; `-PgDumpPath` permite apuntar a `pg_dump.exe` del runtime de pgAdmin.
 
 ## 2025-09-05 — Implementada rotación de JWT
 
