@@ -36,6 +36,21 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 
 ## Entradas (más reciente primero)
 
+## 2025-09-05 — BFF — E2E críticos de tickets (descarga por ticket)
+
+- **Tests E2E** añadidos: `verifactu-bff/test/tickets.e2e-spec.ts` (sin cambios en producción).
+- **Casos cubiertos** (GET `/v1/connector-package/tickets/:token`):
+  - Éxito → `200 OK`, `Content-Type: application/zip`, `Content-Length` **exacto** y `> 0`, y **borrado** del ZIP temporal al finalizar.
+  - Firma inválida → `401 {"message":"Firma inválida"}`.
+  - Token expirado → `401 {"message":"Token expirado"}`.
+  - Reuso tras descarga (artefacto ya no existe) → `401 {"message":"Artefacto no disponible"}`.
+  - Ruta pública/whitelist (sin JWT/x-api-key) con token malformado → `401 {"message":"Token inválido"}`.
+- **Asserts adicionales**: `Content-Length` y inexistencia del archivo en `os.tmpdir()` tras la descarga.
+- **Compatibilidad**: se mantiene en verde el test de whitelist previo.
+- **Ejecución**: `npm run test:e2e` → **3 suites, 7 tests: todos OK**.
+- **Evidencia (código)**: mensajes lanzados por el controller:
+  - `throw new UnauthorizedException('Firma inválida'|'Token expirado'|'Token inválido'|'Artefacto no disponible');`
+
 ## 2025-09-05 — BFF — Cabeceras de seguridad (helmet)
 
 - **Dependencia** añadida: `helmet` (runtime).

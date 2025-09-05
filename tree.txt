@@ -1,0 +1,108 @@
+d:\Trabajo\proyecto-verifactu\
+├───.gitignore
+├───casos-de-prueba.postman_collection.json
+├───headers.txt
+├───package.json
+├───README_DEV.md
+├───README.md
+├───stamped.pdf
+├───verifactu-41.pdf
+├───.github\
+│   ├───PULL_REQUEST_TEMPLATE.md
+│   ├───ISSUE_TEMPLATE\
+│   │   └───tarea.md
+│   └───workflows\
+│       └───ci-verifactu.yml
+├───.vscode\
+├───docs\
+│   ├───ARCHITECTURE.md
+│   ├───CONVENTIONS.md
+│   ├───DECISIONS.md
+│   ├───LOG.md
+│   ├───MEMORIA.md
+│   ├───NEVER_DO.md
+│   ├───PRODUCT_CHARTER.md
+│   └───RESTORE.md
+├───scripts\
+│   └───backup\
+│       ├───backup.ps1
+│       └───backup.sh
+├───TEMPLATES\
+│   ├───AI_BUGFIX_PROMPT.md
+│   ├───AI_CONTRACT_CHANGE.md
+│   ├───AI_DB_MIGRATION_PROMPT.md
+│   ├───AI_ELECTRON_FIX.md
+│   ├───AI_N8N_FLOW_CHANGE.md
+│   └───AI_TICKET_PROMPT.md
+├───tests\
+│   └───regresion\
+│       └───README.md
+├───verifactu-bff\
+│   ├───.env.example
+│   ├───init.sql
+│   ├───jest.config.js
+│   ├───package.json
+│   ├───sign_jwt_next.js
+│   ├───sign_ticket_next.js
+│   ├───sign_ticket_now.js
+│   ├───token.txt
+│   ├───tsconfig.json
+│   ├───tsconfig.spec.json
+│   ├───data\
+│   │   └───invoices\
+│   │       ├───1-VERIFACTU.pdf
+│   │       └───54-VERIFACTU.pdf
+│   ├───logs\
+│   │   ├───app-2025-09-04.jsonl
+│   │   └───app-2025-09-05.jsonl
+│   ├───src\
+│   │   ├───app.controller.ts
+│   │   ├───app.module.ts
+│   │   ├───app.service.ts
+│   │   ├───main.ts
+│   │   ├───api-keys\
+│   │   ├───auth\
+│   │   ├───config\
+│   │   ├───dto\
+│   │   ├───entities\
+│   │   ├───event-log\
+│   │   ├───health\
+│   │   ├───invoices\
+│   │   ├───logging\
+│   │   └───migrations\
+│   └───test\
+├───verifactu-connector\
+│   ├───.prettierrc
+│   ├───aeat.wsdl
+│   ├───eslint.config.mjs
+│   ├───FacturaJustificanteV1.xsd
+│   ├───mock-server.js
+│   ├───nest-cli.json
+│   ├───package.json
+│   ├───README.md
+│   ├───SuministroInformacion.xsd
+│   ├───tsconfig.build.json
+│   ├───tsconfig.json
+│   ├───src\
+│   │   ├───app.controller.spec.ts
+│   │   ├───app.controller.ts
+│   │   ├───app.module.ts
+│   │   ├───app.service.ts
+│   │   ├───main.ts
+│   │   ├───aeat\
+│   │   └───dto\
+│   └───test\
+├───verifactu-flows\
+├───verifactu-printer-connector\
+│   ├───config.json
+│   ├───headers.txt
+│   ├───index.html
+│   ├───main.js
+│   ├───package.json
+│   └───preload.js
+└───verifactu-ui\
+    ├───dashboard.html
+    ├───forgot-password.html
+    ├───index.html
+    ├───login.html
+    └───reset-password.html

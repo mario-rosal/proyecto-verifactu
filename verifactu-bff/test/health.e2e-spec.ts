@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import * as request from 'supertest';
+import request from 'supertest';
 import { HealthModule } from '../src/health/health.module';
 import { HealthService } from '../src/health/health.service';
 

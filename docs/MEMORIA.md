@@ -63,6 +63,17 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    - **Descargas con ticket**: `GET /v1/connector-package/tickets/:token` permitido sin JWT **solo** con token HMAC válido (`DOWNLOAD_TICKET_SECRET`) y `exp`; verificación con `timingSafeEqual`.
    - **Sin secretos hardcodeados**: `JwtModule` y validadores leen de `.env`; `JWT_SECRET_NEXT` es **opcional** y solo para rotación segura.
 
+   - **E2E de tickets (BFF)** *(nuevo)*:
+     - Cobertura (GET `/v1/connector-package/tickets/:token`):
+       - ✅ **Éxito** → `200 OK`, `Content-Type: application/zip`, `Content-Length` **exacto** y `> 0`, **borrado** del ZIP temporal al finalizar.
+       - ❌ **Firma inválida** → `401 {"message":"Firma inválida"}`.
+       - ❌ **Token expirado** → `401 {"message":"Token expirado"}`.
+       - ❌ **Reuso del token** (ZIP ya eliminado) → `401 {"message":"Artefacto no disponible"}`.
+       - 🔓 **Ruta pública/whitelist** (sin JWT/x-api-key) con **token malformado** → `401 {"message":"Token inválido"}`.
+     - Objetivo: asegurar verificabilidad (cabeceras correctas como `Content-Length`) y que **no se re-sirve** ni **re-crea** el artefacto temporal.
+     - Estado: suites e2e en verde; se mantiene el test de whitelist existente.
+
+
    Simulador AEAT (mock-server.js):
    Stack: Node.js, Express.
    Rol: Un simulador que nos sirve los archivos WSDL/XSD y emula las respuestas SOAP, permitiéndonos desarrollar de forma independiente y fiable.
