@@ -11,16 +11,24 @@ import { User } from '../entities/user.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { ApiKey } from '../entities/api-key.entity';
 
+import { ConfigModule, ConfigService } from '@nestjs/config';
+
 // Guard (ajusta la ruta si lo tienes en ./guards/api-key.guard)
 import { ApiKeyGuard } from './api-key.guard';
+import { JwtRotationStrategy } from './jwt-rotation.strategy';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Tenant, ApiKey]),
-    JwtModule.register({
+    ConfigModule,
+    JwtModule.registerAsync({
       global: true,
-      secret: 'tu-secreto-muy-seguro-cambiar-en-produccion',
-      signOptions: { expiresIn: '1d' },
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (config: ConfigService) => ({
+        secret: config.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '1d' },
+      }),
     }),
   ],
   controllers: [AuthController],
@@ -28,6 +36,7 @@ import { ApiKeyGuard } from './api-key.guard';
     AuthService,
     // registramos el guard a nivel global desde el mismo módulo que provee AuthService
     { provide: APP_GUARD, useClass: ApiKeyGuard },
+    JwtRotationStrategy,
   ],
   // exporta el servicio por si lo necesitan otros módulos
   exports: [AuthService],

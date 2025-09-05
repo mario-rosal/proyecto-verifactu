@@ -9,11 +9,11 @@
 
 - **Inmutabilidad:** `event_log` e `invoice_record` son _append-only_ (triggers en BD).
 - **Trazabilidad:** hash SHA-256 encadenado en `invoice_record` (`hash_anterior` → `hash_actual`).
-- **Verificabilidad:** PDF con **QR** + leyenda **“VERI*FACTU”** (endpoint BFF de descarga implementado).
+- **Verificabilidad:** PDF con **QR** + leyenda **“VERI\*FACTU”** (endpoint BFF de descarga implementado).
 
 ## TL;DR (para IA)
 
-- Producto: **Compliance as a Service** (Veri*Factu). **No** somos un ERP.
+- Producto: **Compliance as a Service** (Veri\*Factu). **No** somos un ERP.
 - Stack: NestJS (TS) + PostgreSQL + TypeOrm · n8n + Gemini · UI Vanilla+Tailwind · Electron (printer).
 - Monorepo: https://github.com/mario-rosal/proyecto-verifactu
 - CI: **ligero** (lint/type/build no bloquean; e2e desactivados por ahora).
@@ -36,42 +36,51 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 
 ## Entradas (más reciente primero)
 
+## 2025-09-05 — Implementada rotación de JWT
+
+- BFF: `JwtModule` ahora lee `JWT_SECRET` desde `.env` (se elimina secreto hardcodeado).
+- Se añade `JWT_SECRET_NEXT` como opcional en validación de entorno.
+- Nueva estrategia de validación: acepta tokens firmados con `JWT_SECRET` y también con `JWT_SECRET_NEXT` durante la ventana de rotación.
+- Probado con éxito: login emite JWT válido (`JWT_SECRET`), y `healthz` responde OK con tokens firmados con ambos secretos.
+
 ## 2025-09-04 — BFF — Hardening para producción (completado)
-- **CORS whitelist por `.env`**: `CORS_ORIGINS=http://localhost:8080`.  
-  - Verificado:  
-    - `curl -i -H "Origin: http://localhost:8080" /v1/healthz` → `Access-Control-Allow-Origin: http://localhost:8080`.  
+
+- **CORS whitelist por `.env`**: `CORS_ORIGINS=http://localhost:8080`.
+  - Verificado:
+    - `curl -i -H "Origin: http://localhost:8080" /v1/healthz` → `Access-Control-Allow-Origin: http://localhost:8080`.
     - `curl -i -H "Origin: https://evil.test" /v1/healthz` → **sin** `Access-Control-Allow-Origin`.
 - **Descarga por ticket endurecida**:
-  - `ApiKeyGuard` whitelistea `GET /(v\d+/)?connector-package/tickets/:token` (público solo por token).  
-  - **Rate limiting** activado (cabeceras `X-RateLimit-*` visibles).  
-  - **Rotación de secreto** de tickets soportada: `DOWNLOAD_TICKET_SECRET` + `DOWNLOAD_TICKET_SECRET_NEXT` (verificación intenta ambos).  
-  - Evidencia de flujo real:  
-    - `GET /v1/connector-package/tickets/TESTTOKEN123` → `401 {"message":"Token inválido"}`.  
-    - Firma con **NEXT** y prueba → `401 {"message":"Artefacto no disponible"}` (firma válida, artefacto no existe).  
+  - `ApiKeyGuard` whitelistea `GET /(v\d+/)?connector-package/tickets/:token` (público solo por token).
+  - **Rate limiting** activado (cabeceras `X-RateLimit-*` visibles).
+  - **Rotación de secreto** de tickets soportada: `DOWNLOAD_TICKET_SECRET` + `DOWNLOAD_TICKET_SECRET_NEXT` (verificación intenta ambos).
+  - Evidencia de flujo real:
+    - `GET /v1/connector-package/tickets/TESTTOKEN123` → `401 {"message":"Token inválido"}`.
+    - Firma con **NEXT** y prueba → `401 {"message":"Artefacto no disponible"}` (firma válida, artefacto no existe).
     - Token firmado con secreto actual **y** artefacto temporal presente → `200 OK`, `Content-Type: application/zip`, descarga de `dummy`, y borrado del temporal (`File exists after download? False`).
 - **Logging estructurado** (JSONL por día) + `x-request-id`:
-  - Archivo: `logs/app-YYYY-MM-DD.jsonl` (rotación diaria).  
-  - Ejemplo real:  
+  - Archivo: `logs/app-YYYY-MM-DD.jsonl` (rotación diaria).
+  - Ejemplo real:
     ```
     {"time":"...","reqId":"...","method":"GET","url":"/v1/connector-package/tickets/TESTTOKEN123","ip":"::1","tenantId":null,"level":"error","status":401,"duration_ms":2,"error":{"name":"UnauthorizedException","message":"Token inválido"}}
     ```
-- **Job de purga**: servicio de limpieza de tickets/ZIPs expirados registrado (ScheduleModule activo).  
+- **Job de purga**: servicio de limpieza de tickets/ZIPs expirados registrado (ScheduleModule activo).
   - Además del borrado inmediato tras servir, queda limpieza periódica de temporales expirados.
-- **Tests e2e** (guard whitelist):  
-  - Nuevo `test/apikey-whitelist.e2e-spec.ts` valida que la ruta pública **salta** el guard global y responde `401 "Token inválido"` en el controlador (firma errónea), evitando exigir `x-api-key`.  
+- **Tests e2e** (guard whitelist):
+  - Nuevo `test/apikey-whitelist.e2e-spec.ts` valida que la ruta pública **salta** el guard global y responde `401 "Token inválido"` en el controlador (firma errónea), evitando exigir `x-api-key`.
   - `jest.config.js` añadido y `tsconfig.spec.json` ajustado (tipos de Jest) para estabilidad local de pruebas.
 - **Otros**:
-  - `main.ts`: CORS con whitelist (cuando `CORS_ORIGINS` está definido) y exposición de `x-request-id`.  
+  - `main.ts`: CORS con whitelist (cuando `CORS_ORIGINS` está definido) y exposición de `x-request-id`.
   - `connector-package.controller`: verificación de ticket con HMAC SHA-256 y **rotación** (`*_NEXT`), throttling por endpoint.
 - **Variables de entorno relevantes**:
-  - `CORS_ORIGINS` (coma-separado).  
-  - `DOWNLOAD_TICKET_SECRET` y opcional `DOWNLOAD_TICKET_SECRET_NEXT`.  
+  - `CORS_ORIGINS` (coma-separado).
+  - `DOWNLOAD_TICKET_SECRET` y opcional `DOWNLOAD_TICKET_SECRET_NEXT`.
   - (Operativa de rotación de JWT definida; pendiente consolidar uso de `JWT_SECRET(_NEXT)` en todos los guards/estrategias si no lo estuvieran ya).
 - **Evidencia de cabeceras** observadas:
-  - `X-RateLimit-Limit: 10`, `X-RateLimit-Remaining: 9` en `GET /v1/connector-package/tickets/...`.  
+  - `X-RateLimit-Limit: 10`, `X-RateLimit-Remaining: 9` en `GET /v1/connector-package/tickets/...`.
   - `Access-Control-Allow-Origin: http://localhost:8080` en origin permitido; ausencia en `https://evil.test`.
 
 ## 2025-09-03 — BFF/Electron — ZIP mínimo + tickets de descarga nativos (finalizado)
+
 - **ZIP del conector**: ahora incluye **solo** `config.json` + `VeriFactu-Connector-Setup-*.exe` (sin `win-unpacked`). Tamaño observado estable **~75–79 MB** con `Content-Length` correcto.
 - **Endpoints**:
   - `POST /v1/connector-package/tickets` (JWT) → genera API Key + crea ZIP temporal en `os.tmpdir()` y devuelve `{ url, filename, size, expiresAt }`.
@@ -81,7 +90,7 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
   - Token firmado con `DOWNLOAD_TICKET_SECRET` (HMAC SHA-256) + `exp`. Validación con `timingSafeEqual`.
   - `ApiKeyGuard` permite **solo** el `GET /v1/connector-package/tickets/:token` sin JWT (el token actúa como credencial efímera). Resto de rutas siguen protegidas por **JWT o x-api-key**.
 - **Logging**: `event_log` registra `CONFIG_UPDATE` `{ action: "CONNECTOR_PACKAGE_GENERATED" }` y `{ ticket: true }` cuando aplica.
-- **Evidencia** (sesión): 
+- **Evidencia** (sesión):
   - `POST /v1/connector-package` → `Content-Length: 78602008` / ZIP con **2 ficheros** (`config.json` + `.exe`).
   - `POST /v1/connector-package/tickets` → devuelve `url` firmada y `size: 78602009`.
   - `GET /v1/connector-package/tickets/:token` → `200 OK` con `Content-Length: 78602009` y descarga correcta por GET.
@@ -90,17 +99,17 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
   - Variable de entorno: **`DOWNLOAD_TICKET_SECRET`** (default dev: `change-me-dev-secret`).
   - Próximo opcional: evaluar **`nsis-web`** para reducir aún más el tamaño inicial (stub).
 
-
 ## 2025-09-03 — BFF/Dashboard — Descarga “Guardar como…” + progreso (estabilizada)
+
 - **Endpoint**: `POST /v1/connector-package` (JWT). Respuesta `application/zip` con `Content-Disposition` (nombre de archivo) y **`Content-Length`** (descarga determinista).
 - **CORS**: `Access-Control-Allow-Headers: Authorization, Content-Type` y `Access-Control-Expose-Headers: Content-Disposition`; preflight `OPTIONS` verificado (204).
-- **Dashboard**: emplea **File System Access API** cuando está disponible → diálogo **“Guardar como…”** y escritura por *streaming* con progreso en el botón. *Fallback* universal a Blob + `&lt;a download&gt;`.
+- **Dashboard**: emplea **File System Access API** cuando está disponible → diálogo **“Guardar como…”** y escritura por _streaming_ con progreso en el botón. _Fallback_ universal a Blob + `&lt;a download&gt;`.
 - **Verificación**: descarga reproducible con `curl` (ZIP ~183–187 MB recibido completo).
 - **Sin cambios de contrato**: el botón sigue apuntando a `/v1/connector-package`; no se requieren ajustes de rutas.
 - **Pendiente (tamaño)**: instalador Electron voluminoso. Próximo trabajo propuesto: `nsis-web` (web installer) o recorte de artefactos incluidos. No afecta a la **estabilidad** de la descarga actual.
 
-
 ## 2025-09-01 — BFF — Paquete del conector (MVP descargable)
+
 - Endpoint **POST /connector-package** (JWT-only): genera API Key dedicada y devuelve un **ZIP** con `config.json` `{apiKey, tenantId}` + binarios.
 - Incluye instalador Windows **`bin/VeriFactu-Connector-Setup-1.0.0.exe`** (si existe en `verifactu-printer-connector/bin`); si no, agrega `bin/README.txt`.
 - `event_log`: registra `CONFIG_UPDATE` con `{action:"API_KEY_CREATED"}` y `{action:"CONNECTOR_PACKAGE_GENERATED"}` (tenant_id=1).
@@ -109,6 +118,7 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 - QA: ZIP ~75 MB con `.exe` + `config.json` correcto, verificado con `curl` y apertura local.
 
 ### 2025-09-01 — DASH-APIKEYS-UI (gestión en dashboard + cleanup BD)
+
 - Dashboard (`dashboard.html`): nueva sección **API Keys** (listado, crear, revocar) usando `/api-keys` con JWT.
 - Modal al crear: muestra la clave completa **solo una vez**; listado muestra solo prefijo y metadatos.
 - Acciones de revocación actualizan estado sin recargar toda la página; errores visibles al usuario.
@@ -116,6 +126,7 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 - Limpieza de datos en BD: queda **solo tenant 1**, usuario `mrcompa@gmail.com` y la API Key general (`b4b13628…`).
 
 ### 2025-08-31 — BFF-APIKEYS (endpoints y logging)
+
 - BFF: módulo `api-keys/` con `GET/POST/DELETE /api-keys` (uso desde dashboard con JWT; guardia global JWT|x-api-key sigue activo).
 - Creación: genera clave aleatoria (hex), guarda `key_hash` (SHA-256) y `key_prefix` (8); **devuelve la clave completa solo una vez**.
 - Listado: devuelve solo metadatos (`id`, `keyPrefix`, `isActive`, `createdAt`, `lastUsedAt`), **no** la clave.
@@ -126,20 +137,20 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 ### 2025-08-31 — Cierre Sprint “flujo completo de factura con PDF oficial”
 
 - ✅ Flujo extremo a extremo validado: Webhook (n8n) → OCR/IA → Job `INVOICE_SUBMISSION` → BFF (sellado/hash) → Connector AEAT (mock) → dashboard.
-- ✅ **PDF oficial con sello + leyenda VERI*FACTU + QR** generado/servido por el BFF y descargable desde el dashboard.
+- ✅ **PDF oficial con sello + leyenda VERI\*FACTU + QR** generado/servido por el BFF y descargable desde el dashboard.
 - ✅ Binario PDF preservado entre subflujos de n8n (empaquetado `_pdf.b64` → reinyectado antes de estampar).
 - ✅ Estado visible en dashboard a partir de eventos (`AEAT_CONFIRMED` en `event_log`); BD se mantiene append-only.
 - ✅ Validación de hash encadenado y trazabilidad; sin migraciones ni cambios de CI.
 
-### 2025-08-26 — PDF oficial con QR + “VERI*FACTU” (BFF + Dashboard) — **CONSOLIDADO**
+### 2025-08-26 — PDF oficial con QR + “VERI\*FACTU” (BFF + Dashboard) — **CONSOLIDADO**
 
 - **Endpoint BFF** de descarga del PDF oficial: `GET /invoices/:id/pdf` → `200 OK`, `Content-Type: application/pdf`, `Content-Disposition: inline; filename="verifactu-&lt;serie&gt;-&lt;numero&gt;.pdf"`.
 - **Composición PDF A4** con `pdf-lib` + `qrcode`:
-  - Cabecera/pie con leyenda **“VERI*FACTU — Factura verificable en la sede electrónica de la AEAT”**.
+  - Cabecera/pie con leyenda **“VERI\*FACTU — Factura verificable en la sede electrónica de la AEAT”**.
   - **QR** con URL:
     `https://verifactu.local/verify?nif=&lt;emisor_nif&gt;&serie=&lt;serie&gt;&numero=&lt;numero&gt;&fecha=&lt;YYYY-MM-DD&gt;&total=&lt;importe_total_2d&gt;&hash=&lt;hash_actual&gt;`.
   - **hash_actual** impreso de forma visible.
-- **Flujo n8n**: al sellar, invoca el estampado y deja el PDF disponible; el dashboard muestra el botón de **Descargar Factura VERI*FACTU (PDF)**.
+- **Flujo n8n**: al sellar, invoca el estampado y deja el PDF disponible; el dashboard muestra el botón de **Descargar Factura VERI\*FACTU (PDF)**.
 - **Errores**: `404` si no existe el `invoice_record`; `422` si existe pero no tiene `hash_actual`.
 - **Alcance**: sin migraciones, sin cambios de guards ni de CI.
 
@@ -196,11 +207,11 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 
 ## Bitácora previa (resumen)
 
- - Sprint 0–1: Cimientos y mock AEAT (`mock-server.js`); BFF + Connector iniciales.
- - Sprint 2: Refactor asíncrono (Jobs) + onboarding en n8n con IA; UI de registro con polling.
- - Sprint 3: Dashboard en tiempo real; flujo de `INVOICE_SUBMISSION` completo vía n8n.
- - Sprint 4: Autenticación JWT + roles; dashboard protegido; recuperación de contraseña.
- - Sprint 5: Conector **Electron** (impresora virtual) con `chokidar` + `electron-store`.
- - Sprint 6: Cumplimiento avanzado: `event_log` + reglas append-only.
+- Sprint 0–1: Cimientos y mock AEAT (`mock-server.js`); BFF + Connector iniciales.
+- Sprint 2: Refactor asíncrono (Jobs) + onboarding en n8n con IA; UI de registro con polling.
+- Sprint 3: Dashboard en tiempo real; flujo de `INVOICE_SUBMISSION` completo vía n8n.
+- Sprint 4: Autenticación JWT + roles; dashboard protegido; recuperación de contraseña.
+- Sprint 5: Conector **Electron** (impresora virtual) con `chokidar` + `electron-store`.
+- Sprint 6: Cumplimiento avanzado: `event_log` + reglas append-only.
 
 ---

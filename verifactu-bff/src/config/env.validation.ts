@@ -9,6 +9,7 @@ export default function envValidation(config: Record<string, unknown>) {
     PORT: Joi.number().port().default(3001),
     CORS_ORIGINS: Joi.string().optional(), // "https://app.example.com,https://admin.example.com"
     JWT_SECRET: Joi.string().min(24).required(),
+    JWT_SECRET_NEXT: Joi.string().min(24).optional(),
     DOWNLOAD_TICKET_SECRET: Joi.string().min(24).required(),
   });
 
