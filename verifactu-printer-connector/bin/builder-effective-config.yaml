@@ -8,7 +8,6 @@ files:
   - filter:
       - '**/*'
       - '!bin/**'
-      - '!config.json'
       - '!**/*.map'
       - '!**/tests/**'
       - '!**/test/**'
@@ -21,9 +20,26 @@ win:
     - target: nsis
       arch:
         - x64
+    - target: nsis-web
+      arch:
+        - x64
 nsis:
   oneClick: true
   perMachine: false
   allowToChangeInstallationDirectory: false
   deleteAppDataOnUninstall: true
+  runAfterFinish: true
+  createStartMenuShortcut: true
+  createDesktopShortcut: always
+  shortcutName: VeriFactu Connector
+  uninstallDisplayName: VeriFactu Connector
+nsisWeb:
+  oneClick: true
+  artifactName: VeriFactu-Connector-Web-Setup-${version}.${ext}
+  appPackageUrl: http://127.0.0.1:8080/verifactu-printer-connector-1.0.0-x64.nsis.7z
+  differentialPackage: true
+  runAfterFinish: true
+  createStartMenuShortcut: true
+  createDesktopShortcut: always
+  shortcutName: VeriFactu Connector
 electronVersion: 31.7.7

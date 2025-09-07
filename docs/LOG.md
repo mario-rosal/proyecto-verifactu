@@ -1,7 +1,7 @@
 # LOG del proyecto — VeriFactu
 
 &gt; Bitácora única y fuente de verdad para IA y equipo. Mantener breve, factual y actualizada.  
-&gt; **Última actualización:** 2025-09-05
+&gt; **Última actualización:** 2025-09-07
 
 ---
 
@@ -9,11 +9,11 @@
 
 - **Inmutabilidad:** `event_log` e `invoice_record` son _append-only_ (triggers en BD).
 - **Trazabilidad:** hash SHA-256 encadenado en `invoice_record` (`hash_anterior` → `hash_actual`).
-- **Verificabilidad:** PDF con **QR** + leyenda **“VERI\*FACTU”** (endpoint BFF de descarga implementado).
+- **Verificabilidad:** PDF con **QR** + leyenda **“VERI*FACTU”** (endpoint BFF de descarga implementado).
 
 ## TL;DR (para IA)
 
-- Producto: **Compliance as a Service** (Veri\*Factu). **No** somos un ERP.
+- Producto: **Compliance as a Service** (Veri*Factu). **No** somos un ERP.
 - Stack: NestJS (TS) + PostgreSQL + TypeOrm · n8n + Gemini · UI Vanilla+Tailwind · Electron (printer).
 - Monorepo: https://github.com/mario-rosal/proyecto-verifactu
 - CI: **ligero** (lint/type/build no bloquean; e2e desactivados por ahora).
@@ -35,6 +35,25 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 ---
 
 ## Entradas (más reciente primero)
+
+## 2025-09-07 — Pendiente — Hosting público para instalador NSIS Web
+- El **Web-Setup** funciona correctamente en local (instala, crea atajos, abre la app y desinstala).
+- El dashboard ya genera el **bundle mínimo** (~0.6 MB con `Web-Setup.exe` + `config.json`).
+- **Falta**: disponer de un servidor HTTPS público (S3/MinIO o similar) para alojar el paquete `.nsis.7z` que el stub descarga en la instalación.
+- **Acción futura**: cuando se disponga de esa URL, actualizar `appPackageUrl` en `package.json` a la dirección definitiva y cambiar el dashboard para servir el bundle web en lugar del instalador completo.
+
+
+## 2025-09-06 — Docs — Runbook de operación
+- Añadido `docs/RUNBOOK.md` (rotación de secrets JWT/tickets, purga manual de tickets, restore de BD, lectura de logs); **sin cambios** en BD/CI/guards. Verificado en local: descarga por ticket **200 OK** y purga automática **PURGED OK**.
+
+
+
+## 2025-09-05 — BFF — Purga de temporales: visibilidad
+
+- Servicio `TicketsPurgeService` ahora **siempre** emite un log por ejecución con el formato **`purged N files`** (incluye `N=0`).
+- `purgeOnce(dir?, now?)` expuesto como **público** y devuelve el **conteo exacto** de archivos eliminados; sin cambios en guards, CORS ni esquema de BD.
+- **Test unitario** `src/api-keys/tickets-purge.service.spec.ts`: usa un directorio temporal aislado, crea archivos que **cumplen/no cumplen** el patrón y con timestamps **expirados/no expirados**; verifica borrado, conteo y **log único** (espía de `Logger`).
+- `npm run test` → todas las suites en verde (incluye este spec).
 
 ## 2025-09-05 — BFF — E2E críticos de tickets (descarga por ticket)
 

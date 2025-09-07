@@ -7,6 +7,8 @@
     "start": "electron .",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win nsis",
+    "dist:win:web": "electron-builder --win nsis-web",
+    "bundle:web": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='Stop'; $tmp='bin\\web-bundle-tmp'; if(Test-Path $tmp){Remove-Item $tmp -Recurse -Force}; New-Item -ItemType Directory -Path $tmp | Out-Null; $exe=(Get-ChildItem 'bin\\nsis-web' -Filter '*Setup*.exe' | Select-Object -First 1); if(-not $exe){Write-Error 'No web Setup EXE under bin\\nsis-web'; exit 1}; Copy-Item $exe.FullName (Join-Path $tmp 'VeriFactu-Connector-Web-Setup.exe'); Copy-Item '.\\config.json' (Join-Path $tmp 'config.json') -Force; $zip='bin\\verifactu-connector-web.zip'; if(Test-Path $zip){Remove-Item $zip -Force}; Compress-Archive -Path (Join-Path $tmp '*') -DestinationPath $zip -Force; Remove-Item $tmp -Recurse -Force; Write-Output ('OK ' + $zip)",
     "pack": "electron-builder --dir",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -32,7 +34,7 @@
     "files": [
       "**/*",
       "!bin/**",
-      "!config.json",
+
       "!**/*.map",
       "!**/tests/**",
       "!**/test/**",
@@ -48,6 +50,12 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "nsis-web",
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -55,7 +63,22 @@
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
-      "deleteAppDataOnUninstall": true
+      "deleteAppDataOnUninstall": true,
+      "runAfterFinish": true,
+      "createStartMenuShortcut": true,
+      "createDesktopShortcut": "always",
+      "shortcutName": "VeriFactu Connector",
+      "uninstallDisplayName": "VeriFactu Connector"
+    },
+    "nsisWeb": {
+      "oneClick": true,
+      "artifactName": "VeriFactu-Connector-Web-Setup-${version}.${ext}",
+      "appPackageUrl": "http://127.0.0.1:8080/verifactu-printer-connector-1.0.0-x64.nsis.7z",
+      "differentialPackage": true,
+      "runAfterFinish": true,
+      "createStartMenuShortcut": true,
+      "createDesktopShortcut": "always",
+      "shortcutName": "VeriFactu Connector"
     }
   }
 }

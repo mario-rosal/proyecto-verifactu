@@ -21,26 +21,20 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Stack: NestJS (TypeScript), TypeORM, PostgreSQL.
    Rol: Es el "guardián del estado y la lógica de negocio". Gestiona la API REST, la base de datos, la autenticación de usuarios (con bcrypt y JWT), la lógica de "Trabajos" asíncronos y la generación de API Keys.
 
-   Endpoints relevantes:
+   Endpoints relevantes (consolidados):
 
-   - **POST /v1/connector-package** _(JWT-only)_
+    - **POST /v1/connector-package** _(JWT-only)_
 
-     - Genera **API Key dedicada** y devuelve un **ZIP mínimo** con:
-       - `config.json` `{ apiKey, tenantId }`
-       - **Solo el instalador Windows (Electron/NSIS)** si existe en `verifactu-printer-connector/bin` (se **excluye** `win-unpacked/` para reducir tamaño).
-     - **Cabeceras**: `Content-Type: application/zip`, `Content-Disposition` (nombre) y **`Content-Length`** (determinista).
-     - **Logging**: `event_log` registra `CONFIG_UPDATE` `{ action: "CONNECTOR_PACKAGE_GENERATED" }`.
+   - **GET /v1/invoices/:id/pdf** _(público según guard global)_
+      - Genera **PDF A4** en tiempo real con `pdf-lib` + `qrcode`.
+      - Imprime visible: leyenda **“VERI*FACTU — Factura verificable en la sede electrónica de la AEAT”** y el **`hash_actual`**.
+      - La URL del **QR** incluye los campos del `invoice_record` (`emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`).
+      - **Cabeceras**: `Content-Type: application/pdf`, `Content-Disposition: inline` con nombre `verifactu-&lt;serie&gt;-&lt;numero&gt;.pdf`.
 
    - **POST /v1/connector-package/tickets** _(JWT-only)_
-
-     - Crea el **ZIP temporal** en `os.tmpdir()` (mismo contenido que arriba) y devuelve:
-       `{ url, filename, size, expiresAt }`.
-     - Emite un **token efímero** firmado (HMAC-SHA256) con `exp` (por defecto 10 min).
-     - **Logging**: añade `ticket: true` en `details`.
-
-   - **GET /v1/connector-package/tickets/:token**
-     - **Valida** firma y expiración; sirve el ZIP con `Content-Disposition` + `Content-Length` y **borra** el artefacto al finalizar.
-     - No requiere JWT: el **token firmado** actúa como credencial temporal.
+     - Crea el **ZIP temporal** en `os.tmpdir()` y devuelve `{ url, filename, size, expiresAt }` firmado (HMAC-SHA256, `exp`).
+   - **GET /v1/connector-package/tickets/:token** _(público por token)_
+     - **Valida** firma/expiración; sirve el ZIP con `Content-Length` y **borra** el artefacto tras la descarga.
 
    **Notas de producto**: con la exclusión de `win-unpacked/` el ZIP típico queda en **~75–79 MB** (instalador + config).
 
@@ -50,10 +44,14 @@ Este documento sirve como un registro técnico y estratégico completo del proye
 
    Seguridad (resumen):
 
+   - **Logging estructurado (global)**:
+     - Interceptor **global** escribe JSON por línea en `verifactu-bff/logs/app-YYYY-MM-DD.jsonl`.
+     - Propaga `x-request-id` y registra `method`, `url`, `status`, `duration_ms`, etc.
+
    - **Cabeceras de seguridad (Helmet)** _(nuevo)_:
 
-     - **CSP** compatible con el dashboard: en **dev** permite `'unsafe-inline'` y `'unsafe-eval'`; en **producción** es más estricta (sin `'unsafe-eval'`).
-     - **X-Frame-Options**: `DENY` y **`frame-ancestors 'none'`** en la propia CSP para impedir _embedding_ no autorizado.
+     - **CSP** compatible con el dashboard: en **dev** permite `\'unsafe-inline\'` y `\'unsafe-eval\'`; en **producción** es más estricta (sin `\'unsafe-eval\'`).
+     - **X-Frame-Options**: `DENY` y **`frame-ancestors \'none\'`** en la propia CSP para impedir _embedding_ no autorizado.
      - **Referrer-Policy**: `strict-origin-when-cross-origin`.
      - **HSTS**: activado **solo en producción/HTTPS**; desactivado en desarrollo (HTTP) para evitar falsos positivos.
      - **CORS**: **sin cambios** respecto a la configuración previa (whitelist por `CORS_ORIGINS`, mismos headers expuestos).
@@ -94,13 +92,11 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    Componentes: index.html (Onboarding), login.html, dashboard.html, y las páginas para la recuperación de contraseña.
    Capacidades del Dashboard (estado actual):
 
-   - Listado de facturas y descarga del **PDF oficial Veri\*Factu** (sello + QR).
+   - Listado de facturas y descarga del **PDF oficial Veri*Factu** (sello + QR) vía **`GET /v1/invoices/:id/pdf`**.
    - **Gestión de API Keys** (listar, crear —se muestra solo una vez—, revocar) protegida con JWT.
    - **Descarga del Conector**:
      - Flujo **ticketizado**: `POST /v1/connector-package/tickets` → navegar a `GET /v1/connector-package/tickets/:token`.
      - Usa _File System Access API_ si está disponible para **“Guardar como…”** y progreso en botón; _fallback_ universal a Blob + `&lt;a download&gt;`.
-     - Cabeceras expuestas: `Content-Disposition`; descargas con tamaño conocido (**`Content-Length`**).
-     - Compatible con CORS y `Authorization` (en el POST de ticket).
 
    Conector de Escritorio (verifactu-printer-connector):
    Stack: Electron, chokidar, electron-store, axios.
@@ -126,9 +122,7 @@ Este documento sirve como un registro técnico y estratégico completo del proye
 
    Sprint 7 (DASH-APIKEYS-UI): Se incorporó en el dashboard la **gestión de API Keys** para cada tenant (listar metadatos, crear con visualización única y revocar). El backend expone `GET/POST/DELETE /api-keys` protegido con JWT; el dashboard consume estos endpoints y muestra feedback de errores.
 
-   Sprint E (Sellado Visual de Facturas): Se implementó en el BFF el endpoint `POST /invoices/:id/pdf/stamp`, protegido con ApiKeyGuard. Este servicio recibe un PDF original en `multipart/form-data` y devuelve el mismo documento con un overlay de la leyenda “VERI\*FACTU — Factura verificable en la sede electrónica de la AEAT” en cabecera y pie, junto con un código QR en la esquina superior derecha. El QR codifica la URL de verificación con los campos de `invoice_record` (`emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`). Se verificó mediante pruebas con `curl` que el PDF resultante conserva el contenido original y cumple el contrato de datos definido.
-
-   Sprint F (Disponibilidad del PDF sellado en el Dashboard): Se implementó en el BFF el endpoint `GET /invoices/:id/pdf/stamped`, que permite a los clientes descargar directamente la factura oficial Veri*Factu desde su Dashboard. El sistema guarda los PDFs originales y sellados en un bucket S3-compatible (MinIO en desarrollo, Amazon S3 en producción). El flujo de n8n, al marcar una factura como “sellada”, llama al BFF para estampar el PDF y almacenarlo en la ruta `stamped/<invoice_id>.pdf`. El Dashboard incorpora un botón “Descargar Factura Veri*Factu (PDF)” que llama a este endpoint y entrega al cliente el documento oficial con leyenda y QR. Si el PDF aún no está disponible, se muestra el estado “En preparación”. El QR sigue codificando la URL de verificación con los campos de `invoice_record` (`emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`).
+   **Sprint E/F — PDF oficial consolidado**: Se consolidó en el BFF el endpoint **`GET /v1/invoices/:id/pdf`** que genera **en tiempo real** el **PDF oficial Veri*Factu** con leyenda y **QR** (sin dependencias de S3/MinIO). El Dashboard expone el botón **“Descargar Factura Veri*Factu (PDF)”** que navega a dicho endpoint. El QR codifica la URL de verificación con los campos de `invoice_record` (`emisor_nif`, `serie`, `numero`, `fecha_emision`, `importe_total`, `hash_actual`).
 
    Diagrama del flujo completo:
 
@@ -178,18 +172,18 @@ Este documento sirve como un registro técnico y estratégico completo del proye
    ```
 
 4. El "Hacia Dónde": Próximos Pasos
-   Con el desarrollo funcional principal ya completado, el proyecto entra en preparación de lanzamiento y optimización:
+   Con el desarrollo funcional principal ya completado, el proyecto entra en su fase final de preparación para el lanzamiento.
+   Generación del Documento Final: El BFF ya implementa el endpoint **`GET /v1/invoices/:id/pdf`**, que genera en tiempo real el **PDF oficial Veri*Factu** con leyenda y código QR (usando `pdf-lib` + `qrcode`) e imprime de forma visible el `hash_actual`. El Dashboard expone un botón directo de descarga de este PDF oficial.
+   Empaquetado y Despliegue: El conector de escritorio ahora se distribuye mediante **NSIS Web**. El dashboard entrega un **bundle mínimo** (~0.6 MB) que contiene:
+   - `VeriFactu-Connector-Web-Setup.exe` (stub instalador web)
+   - `config.json` con la API Key dedicada del cliente
+   Durante la instalación, el stub descarga automáticamente el paquete `.nsis.7z` desde la URL configurada, crea accesos directos en Windows y ejecuta la aplicación al finalizar.
+   Integración Real con la AEAT: El último paso será obtener un certificado de sello electrónico oficial y "cambiar el enchufe" del verifactu-connector, pasando de nuestro simulador al entorno de producción de la Agencia Tributaria.
 
-   - **Optimización del instalador (tamaño):** mantener `asar: true`, `compression: "maximum"` y exclusión de test/ejemplos/maps en `electron-builder`; evaluar **`nsis-web`** (web installer) para reducir el binario distribuido desde el dashboard a un _stub_ de pocos MB.
-   - **Distribución:** mantener ZIP con `config.json` + artefacto de instalación; alternativa futura: publicar hash/firmas para verificación de integridad.
-   - **Robustez del conector:** `awaitWriteFinish` en _watcher_ y reintentos exponenciales ante archivos en escritura en Windows.
-   - **Operación:** despliegue del BFF y n8n gestionado; observabilidad mínima (health checks y métricas básicas).
-   - **Integración real con AEAT:** obtención de certificado de sello electrónico y _switch-over_ del conector del simulador al endpoint oficial.
-   - **Optimización adicional de instalador (opcional):** evaluar **NSIS Web (web installer)** para reducir el binario a un _stub_ y descargar componentes durante la instalación.
+   Evidencia técnica (descarga & distribución):
 
-   Evidencia técnica (descarga):
-
-   - `POST /v1/connector-package` → ZIP mínimo (`config.json` + `.exe`) con `Content-Length` estable **~78.6 MB**.
+   - **Antes (instalador completo)**: `POST /v1/connector-package` → ZIP (`config.json` + `.exe`) con `Content-Length` **~75–79 MB**.
+   - **Ahora (NSIS Web)**: bundle de dashboard `verifactu-connector-web.zip` **~0.6 MB** (`Web-Setup.exe` + `config.json`).
    - `POST /v1/connector-package/tickets` → devuelve `url` firmada + `size`; `GET` posterior entrega el ZIP y elimina el temporal.
    - `event_log` registra `CONFIG_UPDATE` en ambos flujos (con `ticket: true` cuando aplica).
 
@@ -202,7 +196,7 @@ Este documento sirve como un registro técnico y estratégico completo del proye
 | `CORS_ORIGINS`                      | **whitelist CORS** (coma-separado) | ej. `https://app.midominio.com,https://admin.midominio.com` |
 | `JWT_SECRET`                        | firma/verificación JWT             | **obligatorio**                                             |
 | `JWT_SECRET_NEXT` (opcional)        | **rotación** JWT                   | aceptar dual en ventana de gracia                           |
-| `DOWNLOAD_TICKET_SECRET`            | HMAC tickets de descarga           | **obligatorio**                                             |
+| `DOWNLOAD_TICKET_SECRET`            | HMAC tickets de descarga           | **obligatorio** · **mínimo 24 chars** (validado en runtime) |
 | `DOWNLOAD_TICKET_SECRET_NEXT` (op.) | **rotación** de tickets            | verificación intenta ambos                                  |
 
 **Operativa de rotación** (JWT/tickets):
@@ -238,7 +232,7 @@ Este documento sirve como un registro técnico y estratégico completo del proye
      El segundo workflow de n8n realiza las validaciones finales (NIF del receptor, etc.).
      Llama al endpoint inteligente del bff para que calcule el hash encadenado y guarde el registro oficial de la factura (invoice_record) en la base de datos.
      Finalmente, le pasa la factura ya sellada al verifactu-connector para su comunicación con la AEAT (simulada).
-     **Generación del Documento Final (Consolidado):** el BFF genera el PDF oficial con QR y leyenda "VERI\*FACTU" y lo expone vía `GET /invoices/:id/pdf/stamped`.
+     **Generación del Documento Final (Consolidado):** el BFF genera el PDF oficial con QR y leyenda "VERI*FACTU" y lo expone vía `GET /v1/invoices/:id/pdf`.
      Disponibilidad en el Dashboard: El dueño del restaurante, al entrar en su dashboard.html, verá la nueva factura en su listado, con el estado "Completado". Desde ahí, podrá descargar el PDF oficial y legal, que es el que debe entregar a su cliente.
 
 6. El Principio de la "Fuente Única de la Verdad" (Single Source of Truth)
