@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiKey } from '../entities/api-key.entity';
@@ -33,8 +33,13 @@ export class ApiKeysService {
   }
 
   async listKeys(tenantId: number) {
+    const tId = Number(tenantId);
+    if (!Number.isFinite(tId)) {
+      // Sin tenant → no devolvemos nada: evitamos fuga de datos entre tenants
+      throw new UnauthorizedException('Tenant no resuelto');
+    }
     const keys = await this.apiKeyRepo.find({
-      where: { tenant: { id: tenantId }, isActive: true },
+      where: { tenant: { id: tId }, isActive: true },
       relations: ['tenant'],
       order: { createdAt: 'DESC' },
     });
@@ -48,8 +53,12 @@ export class ApiKeysService {
   }
 
   async createKey(tenantId: number) {
+    const tId = Number(tenantId);
+    if (!Number.isFinite(tId)) {
+      throw new UnauthorizedException('Tenant no resuelto');
+    }
     // Cargar tenant real para asegurar que TypeORM setea tenant_id
-    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    const tenant = await this.tenantRepo.findOne({ where: { id: tId } });
     if (!tenant) {
       throw new NotFoundException('Tenant no encontrado');
     }
@@ -75,8 +84,12 @@ export class ApiKeysService {
   }
 
   async revokeKey(tenantId: number, id: string) {
+    const tId = Number(tenantId);
+    if (!Number.isFinite(tId)) {
+      throw new UnauthorizedException('Tenant no resuelto');
+    }
     const key = await this.apiKeyRepo.findOne({
-      where: { id, tenant: { id: tenantId }, isActive: true },
+      where: { id, tenant: { id: tId }, isActive: true },
       relations: ['tenant'],
     });
     if (!key) throw new NotFoundException('API Key no encontrada o ya revocada');

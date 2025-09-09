@@ -1,6 +1,8 @@
-import { Controller, Get, Post, Delete, Param, Req } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Req, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { ApiKeysService } from './api-keys.service';
 
+@UseGuards(AuthGuard('jwt-rotation'))
 @Controller('api-keys')
 export class ApiKeysController {
   constructor(private readonly apiKeysService: ApiKeysService) {}

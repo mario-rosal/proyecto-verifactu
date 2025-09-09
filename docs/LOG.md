@@ -1,7 +1,7 @@
 # LOG del proyecto — VeriFactu
 
-&gt; Bitácora única y fuente de verdad para IA y equipo. Mantener breve, factual y actualizada.  
-&gt; **Última actualización:** 2025-09-07
+> Bitácora única y fuente de verdad para IA y equipo. Mantener breve, factual y actualizada.  
+> **Última actualización:** 2025-09-09
 
 ---
 
@@ -14,7 +14,7 @@
 ## TL;DR (para IA)
 
 - Producto: **Compliance as a Service** (Veri*Factu). **No** somos un ERP.
-- Stack: NestJS (TS) + PostgreSQL + TypeOrm · n8n + Gemini · UI Vanilla+Tailwind · Electron (printer).
+- Stack: NestJS (TS) + PostgreSQL + TypeORM · n8n + Gemini · UI Vanilla+Tailwind · Electron (printer).
 - Monorepo: https://github.com/mario-rosal/proyecto-verifactu
 - CI: **ligero** (lint/type/build no bloquean; e2e desactivados por ahora).
 - Salud BFF: `GET /healthz`.
@@ -35,6 +35,22 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 ---
 
 ## Entradas (más reciente primero)
+
+## 2025-09-09 — Electron/BFF — Conector: fix lectura de API Key y verificación de EXE en ZIP
+- **Causa raíz:** desajuste de rutas de `userData` → coexistían dos `config.json`:  
+  - `%APPDATA%\VeriFactu Connector\config.json` (instalador NSIS copia aquí con `apiKey`, `tenantId`).  
+  - `%APPDATA%\verifactu-printer-connector\config.json` (propio de `electron-store`, con `folderPath`).  
+  El conector leía la segunda ruta y no encontraba `apiKey`, mostrando el diálogo genérico (“URL del webhook…”).
+- **Cambios mínimos aplicados en el conector:**  
+  - `main.js`: `app.setName('VeriFactu Connector')` para alinear `app.getPath('userData')` con la ruta donde instala NSIS.  
+  - Lectura con *fallback* seguro de `config.json` (ambas rutas), y mensaje de error más claro cuando falta `apiKey`.
+  - **Sin cambios** en BD/CI/guards/CORS.
+- **Recompilación:** regenerados instaladores **NSIS** y **NSIS Web** con `electron-builder 24.6.3`.
+- **BFF (ZIP del dashboard):** confirmado que empaqueta el **EXE más reciente**: hash SHA-256 **idéntico** entre  
+  `bin\nsis-web\VeriFactu-Connector-Web-Setup-1.0.0.exe` y el `.exe` extraído del ZIP descargado.
+- **Instalador NSIS:** `installer.nsh` ya copia `config.json` desde `$EXEDIR` a `%APPDATA%\VeriFactu Connector\config.json`.  
+  Recomendación operativa: ejecutar el Setup **tras descomprimir** el ZIP (evita perder el `config.json`).
+- **Resultado validado:** al soltar un PDF en la carpeta vigilada se muestra **“Factura Enviada”** (webhook hardcodeado + `apiKey` válida).
 
 ## 2025-09-07 — Pendiente — Hosting público para instalador NSIS Web
 - El **Web-Setup** funciona correctamente en local (instala, crea atajos, abre la app y desinstala).
@@ -88,7 +104,7 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 ## 2025-09-05 — Backups & restore mínimo (Windows verificado)
 
 - **Scripts** añadidos: `scripts/backup/backup.ps1` (PowerShell) y `scripts/backup/backup.sh` (bash opcional); **doc**: `docs/RESTORE.md`.
-- **Backup** probado en Windows con runtime de pgAdmin 4 (`pg_dump.exe`): genera ZIP con timestamp y **tamaño &gt; 0** y copia `logs/*.jsonl` si existen.
+- **Backup** probado en Windows con runtime de pgAdmin 4 (`pg_dump.exe`): genera ZIP con timestamp y **tamaño > 0** y copia `logs/*.jsonl` si existen.
 - **Restore** verificado en BD `verifactu_bff_restore_test` con `psql`; **nota**: si aparece `unrecognized configuration parameter "transaction_timeout"`, quitar esa línea del `.sql` antes de ejecutar.
 - **Sin cambios** en CI ni esquema de BD; uso de `DATABASE_URL` o variables `PG*` para conexión; `-PgDumpPath` permite apuntar a `pg_dump.exe` del runtime de pgAdmin.
 
@@ -106,7 +122,7 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
     - `curl -i -H "Origin: http://localhost:8080" /v1/healthz` → `Access-Control-Allow-Origin: http://localhost:8080`.
     - `curl -i -H "Origin: https://evil.test" /v1/healthz` → **sin** `Access-Control-Allow-Origin`.
 - **Descarga por ticket endurecida**:
-  - `ApiKeyGuard` whitelistea `GET /(v\d+/)?connector-package/tickets/:token` (público solo por token).
+  - `ApiKeyGuard` whitelistea `GET /(v\d+\/)?connector-package/tickets/:token` (público solo por token).
   - **Rate limiting** activado (cabeceras `X-RateLimit-*` visibles).
   - **Rotación de secreto** de tickets soportada: `DOWNLOAD_TICKET_SECRET` + `DOWNLOAD_TICKET_SECRET_NEXT` (verificación intenta ambos).
   - Evidencia de flujo real:
@@ -159,7 +175,7 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 
 - **Endpoint**: `POST /v1/connector-package` (JWT). Respuesta `application/zip` con `Content-Disposition` (nombre de archivo) y **`Content-Length`** (descarga determinista).
 - **CORS**: `Access-Control-Allow-Headers: Authorization, Content-Type` y `Access-Control-Expose-Headers: Content-Disposition`; preflight `OPTIONS` verificado (204).
-- **Dashboard**: emplea **File System Access API** cuando está disponible → diálogo **“Guardar como…”** y escritura por _streaming_ con progreso en el botón. _Fallback_ universal a Blob + `&lt;a download&gt;`.
+- **Dashboard**: emplea **File System Access API** cuando está disponible → diálogo **“Guardar como…”** y escritura por _streaming_ con progreso en el botón. _Fallback_ universal a Blob + `<a> download</a>`.
 - **Verificación**: descarga reproducible con `curl` (ZIP ~183–187 MB recibido completo).
 - **Sin cambios de contrato**: el botón sigue apuntando a `/v1/connector-package`; no se requieren ajustes de rutas.
 - **Pendiente (tamaño)**: instalador Electron voluminoso. Próximo trabajo propuesto: `nsis-web` (web installer) o recorte de artefactos incluidos. No afecta a la **estabilidad** de la descarga actual.
@@ -193,20 +209,20 @@ Usar **tal cual** de `invoice_record`: `emisor_nif`, `serie`, `numero`, `fecha_e
 ### 2025-08-31 — Cierre Sprint “flujo completo de factura con PDF oficial”
 
 - ✅ Flujo extremo a extremo validado: Webhook (n8n) → OCR/IA → Job `INVOICE_SUBMISSION` → BFF (sellado/hash) → Connector AEAT (mock) → dashboard.
-- ✅ **PDF oficial con sello + leyenda VERI\*FACTU + QR** generado/servido por el BFF y descargable desde el dashboard.
+- ✅ **PDF oficial con sello + leyenda VERI*FACTU + QR** generado/servido por el BFF y descargable desde el dashboard.
 - ✅ Binario PDF preservado entre subflujos de n8n (empaquetado `_pdf.b64` → reinyectado antes de estampar).
 - ✅ Estado visible en dashboard a partir de eventos (`AEAT_CONFIRMED` en `event_log`); BD se mantiene append-only.
 - ✅ Validación de hash encadenado y trazabilidad; sin migraciones ni cambios de CI.
 
-### 2025-08-26 — PDF oficial con QR + “VERI\*FACTU” (BFF + Dashboard) — **CONSOLIDADO**
+### 2025-08-26 — PDF oficial con QR + “VERI*FACTU” (BFF + Dashboard) — **CONSOLIDADO**
 
-- **Endpoint BFF** de descarga del PDF oficial: `GET /invoices/:id/pdf` → `200 OK`, `Content-Type: application/pdf`, `Content-Disposition: inline; filename="verifactu-&lt;serie&gt;-&lt;numero&gt;.pdf"`.
+- **Endpoint BFF** de descarga del PDF oficial: `GET /invoices/:id/pdf` → `200 OK`, `Content-Type: application/pdf`, `Content-Disposition: inline; filename="verifactu-<serie>-<numero>.pdf"`.
 - **Composición PDF A4** con `pdf-lib` + `qrcode`:
-  - Cabecera/pie con leyenda **“VERI\*FACTU — Factura verificable en la sede electrónica de la AEAT”**.
+  - Cabecera/pie con leyenda **“VERI*FACTU — Factura verificable en la sede electrónica de la AEAT”**.
   - **QR** con URL:
-    `https://verifactu.local/verify?nif=&lt;emisor_nif&gt;&serie=&lt;serie&gt;&numero=&lt;numero&gt;&fecha=&lt;YYYY-MM-DD&gt;&total=&lt;importe_total_2d&gt;&hash=&lt;hash_actual&gt;`.
+    `https://verifactu.local/verify?nif=<emisor_nif>&serie=<serie>&numero=<numero>&fecha=<YYYY-MM-DD>&total=<importe_total_2d>&hash=<hash_actual>`.
   - **hash_actual** impreso de forma visible.
-- **Flujo n8n**: al sellar, invoca el estampado y deja el PDF disponible; el dashboard muestra el botón de **Descargar Factura VERI\*FACTU (PDF)**.
+- **Flujo n8n**: al sellar, invoca el estampado y deja el PDF disponible; el dashboard muestra el botón de **Descargar Factura VERI*FACTU (PDF)**.
 - **Errores**: `404` si no existe el `invoice_record`; `422` si existe pero no tiene `hash_actual`.
 - **Alcance**: sin migraciones, sin cambios de guards ni de CI.
 

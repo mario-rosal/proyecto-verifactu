@@ -24,6 +24,7 @@ win:
       arch:
         - x64
 nsis:
+  include: build/installer.nsh
   oneClick: true
   perMachine: false
   allowToChangeInstallationDirectory: false
@@ -34,6 +35,7 @@ nsis:
   shortcutName: VeriFactu Connector
   uninstallDisplayName: VeriFactu Connector
 nsisWeb:
+  include: build/installer.nsh
   oneClick: true
   artifactName: VeriFactu-Connector-Web-Setup-${version}.${ext}
   appPackageUrl: http://127.0.0.1:8080/verifactu-printer-connector-1.0.0-x64.nsis.7z
@@ -42,4 +44,4 @@ nsisWeb:
   createStartMenuShortcut: true
   createDesktopShortcut: always
   shortcutName: VeriFactu Connector
-electronVersion: 31.7.7
+electronVersion: 38.0.0

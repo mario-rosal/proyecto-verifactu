@@ -16,8 +16,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "electron": "^31.0.1",
-    "electron-builder": "24.6.3"
+    "electron": "^38.0.0",
+    "electron-builder": "^24.13.3"
   },
   "dependencies": {
     "axios": "^1.11.0",
@@ -34,7 +34,6 @@
     "files": [
       "**/*",
       "!bin/**",
-
       "!**/*.map",
       "!**/tests/**",
       "!**/test/**",
@@ -60,6 +59,7 @@
       ]
     },
     "nsis": {
+      "include": "build/installer.nsh",
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
@@ -71,6 +71,7 @@
       "uninstallDisplayName": "VeriFactu Connector"
     },
     "nsisWeb": {
+      "include": "build/installer.nsh",
       "oneClick": true,
       "artifactName": "VeriFactu-Connector-Web-Setup-${version}.${ext}",
       "appPackageUrl": "http://127.0.0.1:8080/verifactu-printer-connector-1.0.0-x64.nsis.7z",

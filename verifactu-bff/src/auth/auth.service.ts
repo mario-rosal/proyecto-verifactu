@@ -105,19 +105,16 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales incorrectas.');
     }
 
-    const payload = { 
-        sub: user.id, 
-        email: user.email, 
-        role: user.role,
-        tenantId: user.tenant.id 
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenant.id,
     };
-    
-    // --- 👇 GENERAR Y DEVOLVER API KEY TEMPORAL JUNTO AL TOKEN 👇 ---
-    const temporaryApiKey = await this._generateAndSaveTemporaryApiKey(user.tenant);
-
+    // No crear API Key en login: solo JWT. Las API Keys se gestionan desde /v1/api-keys (dashboard).
     return {
       access_token: await this.jwtService.signAsync(payload),
-      api_key: temporaryApiKey, // El cliente la usará para las siguientes peticiones
+      api_key: null,
     };
   }
 
