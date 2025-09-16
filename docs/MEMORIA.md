@@ -173,11 +173,8 @@ Este documento sirve como un registro técnico y estratégico completo del proye
 
 4. El "Hacia Dónde": Próximos Pasos
    Con el desarrollo funcional principal ya completado, el proyecto entra en su fase final de preparación para el lanzamiento.
-   Generación del Documento Final: El BFF ya implementa el endpoint **`GET /v1/invoices/:id/pdf`**, que genera en tiempo real el **PDF oficial Veri*Factu** con leyenda y código QR (usando `pdf-lib` + `qrcode`) e imprime de forma visible el `hash_actual`. El Dashboard expone un botón directo de descarga de este PDF oficial.
-   Empaquetado y Despliegue: El conector de escritorio ahora se distribuye mediante **NSIS Web**. El dashboard entrega un **bundle mínimo** (~0.6 MB) que contiene:
-   - `VeriFactu-Connector-Web-Setup.exe` (stub instalador web)
-   - `config.json` con la API Key dedicada del cliente
-   Durante la instalación, el stub descarga automáticamente el paquete `.nsis.7z` desde la URL configurada, crea accesos directos en Windows y ejecuta la aplicación al finalizar.
+   PDF Oficial Consolidado: Ya está implementada la generación del PDF oficial de la factura con código QR y la leyenda "VERI*FACTU", mediante el endpoint `/v1/invoices/:id/pdf/stamp` (subida y estampado) y `/v1/invoices/:id/pdf/stamped` (descarga). El flujo de n8n invoca este servicio tras el sellado.
+   Empaquetado y Despliegue: Usamos electron-builder (NSIS y NSIS Web) para crear los instaladores profesionales del conector. El dashboard genera un ZIP con `config.json` y el instalador actualizado. Próximo paso: disponer de hosting público (S3/MinIO) para servir el paquete `.nsis.7z` del Web-Setup.
    Integración Real con la AEAT: El último paso será obtener un certificado de sello electrónico oficial y "cambiar el enchufe" del verifactu-connector, pasando de nuestro simulador al entorno de producción de la Agencia Tributaria.
 
    Evidencia técnica (descarga & distribución):
